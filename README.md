@@ -35,7 +35,9 @@ The pipeline has three steps:
 
 ### Branch rule
 
-The workflow runs only for pushes to `main` and to branches that start with `feature/`, `bugfix/`, `hotfix/` or `release/`.
+The workflow runs for pushes to `main` and to branches that start with `feature/`, `bugfix/`, `hotfix/` or `release/`.
+You can also start it manually (`workflow_dispatch`).
+The `github-hooks` workflow starts it this way after it opens a range-update PR, because a branch that `GITHUB_TOKEN` pushes starts no `push` run.
 Each branch other than `main` must match this regular expression:
 
 ```
@@ -83,7 +85,7 @@ The values file has two parts.
 | `escapeHatch` | `pushToInfisical: false` | Copies the break-glass admin password to Infisical `/jenkins/admin`. |
 | `additionalSecrets` | `[]` | More Infisical secrets. Each entry can become a Jenkins credential, for example a `secretFile` kubeconfig for another cluster. |
 | `uiRoute` | `enabled: false` | The IngressRoute for the Jenkins UI on `<ui-host>`. |
-| `webhookRoute` | `enabled: false` | The IngressRoute for `/github-webhook/` only on `<webhook-host>`, behind the GitHub allowlist. |
+| `webhookRoute` | `enabled: false` | The IngressRoute for `/github-webhook/` only on `<webhook-host>`, behind the GitHub allowlist. `githubHookSourceRanges` holds the GitHub meta `.hooks` ranges (chart default, refreshed each week). `additionalHookSourceRanges` (`[]`) adds more ranges. `ipStrategyDepth` (`0`) tells Traefik which IP to check: `0` uses the connection source IP. Set `1` when exactly one trusted proxy, such as Cloudflare, is in front. |
 | `deployNamespaces` | `[]` | One `jenkins-deployer` RoleBinding (ClusterRole `admin`) for each namespace in the list. |
 | `sharedLibraries` | `[]` | Pipeline libraries: `{name, repo, defaultVersion?}`. |
 | `organizationFolders` | `[]` | GitHub organization folders: `{name, owner}`. |
@@ -109,7 +111,9 @@ stage('deploy') {
 }
 ```
 
-Load a library with an explicit version. Libraries have no default version:
+A library has no default version unless you set `sharedLibraries[].defaultVersion`.
+Without `defaultVersion`, a `@Library` line with no version fails.
+Pin the version in each `Jenkinsfile`:
 
 ```groovy
 @Library('<name>@<version>') _
