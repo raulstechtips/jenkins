@@ -322,7 +322,10 @@ tests:
           pattern: 'orphanedItemStrategy \{ discardOldItems \{ daysToKeep\(7\) \} \}'
       - matchRegex:
           path: data["jobs.yaml"]
-          pattern: "strategy \\{\\s+allBranchesSame \\{\\s+props \\{\\s+suppressAutomaticTriggering \\{\\s+strategy\\('INDEXING'\\)\\s+triggeredBranchesRegex\\('\\.\\*'\\)"
+          pattern: "properties \\{ suppressFolderAutomaticTriggering \\{ branches\\('\\.\\*'\\); strategy\\('INDEXING'\\) \\} \\}"
+      - notMatchRegex:
+          path: data["jobs.yaml"]
+          pattern: 'allBranchesSame|suppressAutomaticTriggering'
       - matchRegex:
           path: data["jobs.yaml"]
           pattern: 'buildStrategies \{\s+buildRegularBranches\(\)\s+buildChangeRequests \{ ignoreTargetOnlyChanges\(true\); ignoreUntrustedChanges\(true\) \}'

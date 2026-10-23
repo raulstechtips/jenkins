@@ -147,16 +147,7 @@ data:
             projectFactories { workflowMultiBranchProjectFactory { scriptPath('Jenkinsfile') } }
             triggers { periodicFolderTrigger { interval('1d') } }
             orphanedItemStrategy { discardOldItems { daysToKeep(7) } }
-            strategy {
-              allBranchesSame {
-                props {
-                  suppressAutomaticTriggering {
-                    strategy('INDEXING')
-                    triggeredBranchesRegex('.*')
-                  }
-                }
-              }
-            }
+            properties { suppressFolderAutomaticTriggering { branches('.*'); strategy('INDEXING') } }
             buildStrategies {
               buildRegularBranches()
               buildChangeRequests { ignoreTargetOnlyChanges(true); ignoreUntrustedChanges(true) }

@@ -86,6 +86,13 @@ jenkins:
     installPlugins:
       - kubernetes:4560.vc25b_83890c34 # Provision build agents as pods.
       - workflow-aggregator:608.v67378e9d3db_1 # Run Jenkins pipelines.
+      # Keep the Declarative plugins on one release: optional kubernetes dependencies need 2.2277 or later.
+      - pipeline-model-definition:2.2277.v00573e73ddf1 # Run Declarative pipelines.
+      - pipeline-model-api:2.2277.v00573e73ddf1 # Match the Declarative release.
+      - pipeline-model-extensions:2.2277.v00573e73ddf1 # Match the Declarative release.
+      - pipeline-stage-tags-metadata:2.2277.v00573e73ddf1 # Match the Declarative release.
+      - pipeline-stage-step:322.vecffa_99f371c # Meet the Declarative extensions minimum.
+      - workflow-durable-task-step:1464.v2d3f5c68f84c # Meet the kubernetes plugin minimum.
       - git:5.11.0 # Check out Git repositories.
       - github:1.47.0 # Receive GitHub hooks.
       - github-branch-source:1986.v801e40614d00 # Discover repositories and pull requests.
