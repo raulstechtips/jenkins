@@ -1,0 +1,26 @@
+{{- $agentLabel := printf "jenkins/%s-%s" .Release.Name .Values.jenkins.agent.componentName -}}
+{{- if not (hasKey .Values.jenkins.additionalAgents.deployer.podLabels $agentLabel) -}}
+{{- fail (printf "jenkins.additionalAgents.deployer.podLabels must contain %s" $agentLabel) -}}
+{{- end -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jenkins-deployer
+  namespace: {{ .Release.Namespace }}
+automountServiceAccountToken: true
+{{- range .Values.deployNamespaces }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-deployer
+  namespace: {{ . | quote }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: admin
+subjects:
+  - kind: ServiceAccount
+    name: jenkins-deployer
+    namespace: {{ $.Release.Namespace }}
+{{- end }}

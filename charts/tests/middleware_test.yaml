@@ -1,6 +1,8 @@
 suite: GitHub webhook allowlist
 templates:
   - templates/middleware-github-hooks.yaml
+release:
+  name: jenkins
 tests:
   - it: renders nothing by default
     asserts:
@@ -104,6 +106,9 @@ tests:
       namespace: hooks
     values:
       - ../ci/all-on-values.yaml
+    set:
+      jenkins.additionalAgents.deployer.podLabels:
+        jenkins/ci-jenkins-agent: "true"
     asserts:
       - equal:
           path: metadata

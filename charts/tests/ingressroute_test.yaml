@@ -2,6 +2,8 @@ suite: Jenkins ingress routes
 templates:
   - templates/ingressroute-ui.yaml
   - templates/ingressroute-webhook.yaml
+release:
+  name: jenkins
 tests:
   - it: renders neither route by default
     asserts:
@@ -64,6 +66,8 @@ tests:
       webhookRoute.host: jenkins.example.test
       webhookRoute.tlsSecretName: fake-webhook-tls
       webhookRoute.middlewares: [{name: default-headers, namespace: default}]
+      jenkins.additionalAgents.deployer.podLabels:
+        jenkins/ci-jenkins-agent: "true"
     template: templates/ingressroute-webhook.yaml
     asserts:
       - hasDocuments:

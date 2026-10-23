@@ -1,6 +1,8 @@
 suite: Infisical escape hatch push
 templates:
   - templates/escape-hatch-push.yaml
+release:
+  name: jenkins
 tests:
   - it: renders nothing by default
     asserts:
@@ -60,6 +62,8 @@ tests:
       - ../ci/all-on-values.yaml
     set:
       escapeHatch.secretPath: /custom/admin
+      jenkins.additionalAgents.deployer.podLabels:
+        jenkins/ci-jenkins-agent: "true"
     asserts:
       - equal:
           path: spec.push.secret.secretName

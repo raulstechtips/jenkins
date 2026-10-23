@@ -61,7 +61,7 @@ webhookRoute:
     - 2a0a:a440::/29
     - 2606:50c0::/32
   additionalHookSourceRanges: []
-deployNamespaces: []
+deployNamespaces: [a, b]
 sharedLibraries: []
 organizationFolders: []
 jenkins: {}

@@ -71,6 +71,10 @@ webhookRoute:
     - 2a0a:a440::/29 # Accept this public GitHub hook range.
     - 2606:50c0::/32 # Accept this public GitHub hook range.
   additionalHookSourceRanges: [] # Extend the public hook list when necessary.
+# Namespaces must exist before they are listed.
+# To revoke access, remove the namespace here and run:
+# kubectl -n <ns> delete rolebinding jenkins-deployer
+# Prune is off, so removal from this list does not delete the RoleBinding.
 deployNamespaces: [] # Grant no deployment rights until namespaces are listed.
 sharedLibraries: [] # Add explicit libraries with name, repo and optional defaultVersion.
 organizationFolders: [] # Add App-owned organization folders with name and owner.
@@ -134,6 +138,37 @@ jenkins:
         args: infinity # Keep it alive for the pod lifetime.
         TTYEnabled: false # Do not allocate an interactive terminal.
         runAsUser: 1000 # Run shell commands without root.
+  # Require an explicit deployer label for work with cluster credentials.
+  additionalAgents:
+    # Merge this template into the same upstream Kubernetes cloud.
+    deployer:
+      podName: deployer # Give deployment pods a separate name.
+      componentName: jenkins-deployer # Do not share the generic Jenkins label.
+      customJenkinsLabels: [deployer] # Let deployment stages request this agent.
+      nodeUsageMode: EXCLUSIVE # Do not accept work without this agent label.
+      # Keep the agent pod label required by the upstream NetworkPolicy.
+      podLabels:
+        jenkins/jenkins-jenkins-agent: "true" # Match release jenkins and agent component jenkins-agent.
+      serviceAccount: jenkins-deployer # Use only the namespace deployment bindings.
+      # Give deployment work a token without running containers as root.
+      yamlTemplate: |-
+        apiVersion: v1
+        kind: Pod
+        spec:
+          automountServiceAccountToken: true
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+      # Supply kubectl and Helm for deployment stages.
+      additionalContainers:
+        - sideContainerName: kubectl # Expose deployment tools to pipelines.
+          image: # Pin the Kubernetes 1.30 tools image.
+            repository: alpine/k8s # Supply kubectl and Helm together.
+            tag: "1.30.14" # Match the cluster Kubernetes minor version.
+          command: sleep # Keep tools ready for pipeline commands.
+          args: infinity # Keep the container alive for the pod lifetime.
+          TTYEnabled: false # Do not allocate an interactive terminal.
+          runAsUser: 1000 # Run deployment commands without root.
   # Allow the credentials provider to watch labelled Secrets.
   rbac:
     readSecrets: true # Grant the controller get, watch and list access to Secrets.
