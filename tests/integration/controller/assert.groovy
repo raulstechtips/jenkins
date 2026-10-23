@@ -18,17 +18,29 @@ def baked = new File('/usr/share/jenkins/ref/plugins').listFiles().findAll {
     it.name.endsWith('.jpi') || it.name.endsWith('.hpi')
 }
 assert !baked.empty
+def bakedVersions = [:]
 baked.each { archive ->
     new JarFile(archive).withCloseable { jar ->
         def attributes = jar.manifest.mainAttributes
         def id = attributes.getValue('Short-Name')
         def version = attributes.getValue('Plugin-Version')
+        bakedVersions[id] = version
         def plugin = jenkins.pluginManager.getPlugin(id)
         assert plugin != null : "Missing baked plugin: ${id}"
         assert plugin.active : "Inactive baked plugin: ${id}"
         assert plugin.version == version : "Wrong baked version: ${id}: ${plugin.version} != ${version}"
     }
 }
+// The image must contain exactly the lock: no missing and no extra plugin.
+def locked = new File('/test/plugins.lock.txt').readLines().collect {
+    it.replaceFirst(/#.*/, '').trim()
+}.findAll { it }.collectEntries { entry ->
+    def parts = entry.split(':', 2)
+    assert parts.length == 2 : "Bad lock line: ${entry}"
+    [(parts[0]): parts[1]]
+}
+assert !locked.isEmpty()
+assert bakedVersions == locked : "Image differs from lock. Only in image: ${bakedVersions - locked}; only in lock: ${locked - bakedVersions}"
 def pins = new File('/test/plugins.txt').readLines().collect {
     it.replaceFirst(/#.*/, '').trim()
 }.findAll { it }

@@ -93,6 +93,8 @@ jobs:
           # The archive holds the binary. Remove the hook that downloads it again.
           sed -i '/^hooks:/,$d' "$RUNNER_TEMP/helm-unittest/plugin.yaml"
           helm plugin install "$RUNNER_TEMP/helm-unittest"
+      - name: Check the plugin lock
+        run: bash plugins/lock.sh --check
       - name: Test and render the chart
         run: |
           helm repo add jenkins https://charts.jenkins.io
@@ -141,4 +143,4 @@ jobs:
           echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
           "$RUNNER_TEMP/actionlint" .github/workflows/*.yaml
-          shellcheck scripts/*.sh tests/integration/controller/run.sh
+          shellcheck scripts/*.sh plugins/lock.sh tests/integration/controller/run.sh

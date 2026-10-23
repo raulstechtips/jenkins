@@ -19,7 +19,7 @@ oci://ghcr.io/raulstechtips/charts/jenkins
 
 | Path | Contents |
 | --- | --- |
-| `plugins/` | `Dockerfile` and `plugins.txt`: build the controller with plugins installed. |
+| `plugins/` | `Dockerfile`, `plugins.txt` (the plugins we choose, pinned), `plugins.lock.txt` (generated: those pins and all dependencies) and `lock.sh` (makes the lock). |
 | `charts/` | The Helm chart. `Chart.yaml`, `Chart.lock`, `values.yaml` and `values.schema.json`. |
 | `charts/templates/` | Our own templates: Infisical secrets, IngressRoutes, the GitHub allowlist Middleware, deployer RBAC and JCasC ConfigMaps. |
 | `charts/tests/` | The helm-unittest unit tests (`*_test.yaml`). They check the rendered templates only. |
@@ -145,17 +145,32 @@ docker build -t jenkins-controller:local plugins
 bash tests/integration/controller/run.sh jenkins-controller:local
 ```
 
-The image build resolves plugin dependencies. Requested versions are pinned in
-`plugins/plugins.txt`; this is not a complete transitive dependency lock.
-The published chart selects the finished image by digest, so a deployment does
-not resolve plugins again.
+The image installs `plugins/plugins.lock.txt`. The lock lists every plugin with an
+exact version, so the build resolves nothing. The published chart selects the
+finished image by digest, so a deployment does not resolve plugins again.
+
+## Plugin lock
+
+`plugins/plugins.txt` lists only the plugins we choose, each pinned.
+`plugins/plugins.lock.txt` is generated from it. Do not edit the lock by hand.
+
+```bash
+bash plugins/lock.sh          # resolve plugins.txt and write the lock (needs Docker)
+bash plugins/lock.sh --check  # check that the lock keeps every pin (CI runs this)
+```
+
+`lock.sh` runs `jenkins-plugin-cli --latest true --no-download` in the Dockerfile
+base image. The pins in `plugins.txt` stay as written. Each dependency gets the
+newest version that is compatible with that Jenkins core.
+The integration test fails if the image does not contain exactly the lock.
 
 ## 7. Runbook
 
 - **Escape hatch.** If the escape-hatch password fails, use the previous version in Infisical history, or restart the controller pod.
 - **New deploy namespace.** The namespace must exist before you add it to `deployNamespaces`.
 - **Revoke deploy rights.** Remove the namespace from `deployNamespaces`. Then run `kubectl -n <ns> delete rolebinding jenkins-deployer`. The Application has prune off, so Argo CD does not delete the old RoleBinding.
-- **Plugin upgrade.** Edit the pin in `plugins/plugins.txt`. Build and test the image, then deploy the new chart version. Keep the `pipeline-model-*` pins on one release: the `kubernetes` plugin sets minimum versions for them through optional dependencies.
+- **Plugin upgrade.** To change a plugin we choose, edit its pin in `plugins/plugins.txt`. To update dependencies, change nothing. Then run `bash plugins/lock.sh` and commit `plugins.txt` and `plugins.lock.txt` together. CI builds and tests the image. Deploy the new chart version.
+- **Plugin warnings in the UI.** Do not update plugins in the Jenkins UI. The next restart removes those updates. Run `bash plugins/lock.sh` and ship a new image.
 - **Hook-range PR.** A merged hook-range PR publishes a new chart version. Bump `targetRevision` in `cluster-config`. If you do not, the new GitHub ranges stay blocked.
 - **Infisical change.** The Kubernetes Secret gets the new value within 60 s. Jenkins reads the value only at a JCasC reload or a restart.
 - **Controller start.** The image contains the plugins. The init container removes old plugins from the home volume; the controller copies the image's plugin set at startup. No plugins are downloaded at startup. UI-installed plugins do not survive a restart.
