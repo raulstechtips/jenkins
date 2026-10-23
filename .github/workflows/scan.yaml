@@ -15,7 +15,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [amd64, arm64]
+        # The cluster runs only amd64 nodes, so only that image is scanned.
+        arch: [amd64]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
