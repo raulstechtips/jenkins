@@ -7,7 +7,7 @@ on:
         description: The matched controller image and chart version
         value: ${{ jobs.version.outputs.version }}
       image_digest:
-        description: The published multiarch controller image digest
+        description: The published amd64 controller image digest
         value: ${{ jobs.image.outputs.digest }}
 
 permissions:
@@ -65,37 +65,25 @@ jobs:
     outputs:
       digest: ${{ steps.publish.outputs.digest }}
     steps:
-      - name: Download both tested and scanned images
+      - name: Download the tested and scanned image
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: controller-image-*
-          merge-multiple: true
+          name: controller-image-amd64
           path: ${{ runner.temp }}/images
       - name: Log in to GHCR
         env:
           GITHUB_TOKEN: ${{ github.token }}
           ACTOR: ${{ github.actor }}
         run: echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
-      - name: Publish the tested images and multiarch manifest
+      - name: Publish the tested amd64 image
         id: publish
         run: |
           test -n "$VERSION"
-          SOURCES=()
-          for ARCH in amd64 arm64; do
-            docker load --input "$RUNNER_TEMP/images/controller-$ARCH.tar"
-            test "$(docker image inspect "jenkins-controller:ci-$ARCH" --format '{{.Architecture}}')" = "$ARCH"
-            REF="$IMAGE:$VERSION-$ARCH"
-            docker tag "jenkins-controller:ci-$ARCH" "$REF"
-            docker push "$REF"
-            DIGEST=$(docker buildx imagetools inspect "$REF" --format '{{json .Manifest}}' | jq -er '.digest')
-            [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
-            SOURCES+=("$IMAGE@$DIGEST")
-            rm "$RUNNER_TEMP/images/controller-$ARCH.tar"
-          done
-          docker buildx imagetools create --tag "$IMAGE:$VERSION" "${SOURCES[@]}"
-          docker buildx imagetools inspect "$IMAGE:$VERSION" --format '{{json .Manifest}}' > "$RUNNER_TEMP/image-manifest.json"
-          jq -e '[.manifests[].platform | .os + "/" + .architecture] | sort == ["linux/amd64", "linux/arm64"]' "$RUNNER_TEMP/image-manifest.json"
-          DIGEST=$(jq -er '.digest' "$RUNNER_TEMP/image-manifest.json")
+          docker load --input "$RUNNER_TEMP/images/controller-amd64.tar"
+          test "$(docker image inspect jenkins-controller:ci-amd64 --format '{{.Architecture}}')" = amd64
+          docker tag jenkins-controller:ci-amd64 "$IMAGE:$VERSION"
+          docker push "$IMAGE:$VERSION"
+          DIGEST=$(docker buildx imagetools inspect "$IMAGE:$VERSION" --format '{{json .Manifest}}' | jq -er '.digest')
           [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
           echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
           echo "$IMAGE:$VERSION@$DIGEST" >> "$GITHUB_STEP_SUMMARY"

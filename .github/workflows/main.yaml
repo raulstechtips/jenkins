@@ -1,7 +1,7 @@
 name: main
 
-# One pipeline: test both image architectures and the chart, then scan both.
-# Publish the tested images as one multiarch release before the matched chart.
+# One pipeline: test the amd64 controller image and the chart, then scan both.
+# Publish the tested image before the matched chart.
 # The scan only warns. A HIGH or CRITICAL finding does not stop the publish.
 on:
   push:

@@ -32,9 +32,9 @@ oci://ghcr.io/raulstechtips/charts/jenkins
 
 The pipeline has three steps:
 
-1. **Test.** Helm lint, helm-unittest, `helm template` and kubeconform. Build the controller on native AMD64 and ARM64 runners. Start each image without external networking, with fresh and reused Jenkins home volumes, and check its plugins and JCasC. A check also stops the run if a file contains a private key.
-2. **Scan.** Security scans of the rendered chart and the tested amd64 controller image. The cluster runs only amd64 nodes, so the arm64 image is built and tested but not scanned.
-3. **Publish.** Make the release version, push the tested images and their multiarch manifest, then package and publish the chart with `image.tag` set to `<version>@<digest>`. No chart is published unless its controller image was published first.
+1. **Test.** Helm lint, helm-unittest, `helm template` and kubeconform. Build the controller image for amd64 only, because the cluster runs only amd64 nodes. Start the image without external networking, with fresh and reused Jenkins home volumes, and check its plugins and JCasC. A check also stops the run if a file contains a private key.
+2. **Scan.** Security scans of the rendered chart and the tested amd64 controller image.
+3. **Publish.** Make the release version, push the tested amd64 image, then package and publish the chart with `image.tag` set to `<version>@<digest>`. No chart is published unless its controller image was published first.
 
 ### Branch rule
 
