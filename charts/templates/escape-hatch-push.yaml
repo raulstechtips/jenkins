@@ -1,0 +1,30 @@
+{{- if .Values.escapeHatch.pushToInfisical }}
+apiVersion: secrets.infisical.com/v1alpha1
+kind: InfisicalPushSecret
+metadata:
+  name: jenkins-escape-hatch
+  namespace: {{ .Release.Namespace }}
+spec:
+  hostAPI: {{ required "infisical.push.hostAPI is required when escapeHatch.pushToInfisical is enabled" .Values.infisical.push.hostAPI | quote }}
+  authentication:
+    universalAuth:
+      credentialsRef:
+        secretName: {{ required "infisical.push.credentialsRef.name is required when escapeHatch.pushToInfisical is enabled" .Values.infisical.push.credentialsRef.name | quote }}
+        secretNamespace: {{ required "infisical.push.credentialsRef.namespace is required when escapeHatch.pushToInfisical is enabled" .Values.infisical.push.credentialsRef.namespace | quote }}
+  resyncInterval: 1m
+  updatePolicy: Replace
+  deletionPolicy: None
+  destination:
+    projectSlug: {{ required "infisical.projectSlug is required when escapeHatch.pushToInfisical is enabled" .Values.infisical.projectSlug | quote }}
+    environmentSlug: {{ required "infisical.environmentSlug is required when escapeHatch.pushToInfisical is enabled" .Values.infisical.environmentSlug | quote }}
+    secretsPath: {{ .Values.escapeHatch.secretPath | quote }}
+  push:
+    secret:
+      secretName: {{ include "jenkins-wrapper.upstreamFullname" . }}
+      secretNamespace: {{ .Release.Namespace }}
+      template:
+        includeAllSecrets: false
+        data:
+          JENKINS_ADMIN_USER: {{ `{{ (index . "jenkins-admin-user").Value }}` | quote }}
+          JENKINS_ADMIN_PASSWORD: {{ `{{ (index . "jenkins-admin-password").Value }}` | quote }}
+{{- end }}

@@ -1,26 +1,40 @@
 # Later units enable their own features in this complete wrapper fixture.
 infisical:
-  authRef: {name: "", namespace: ""}
-  projectSlug: ""
-  environmentSlug: ""
+  authRef: {name: fake-auth, namespace: fake-auth-namespace}
+  projectSlug: fake-project
+  environmentSlug: fake-env
   push:
-    hostAPI: ""
-    credentialsRef: {name: "", namespace: ""}
+    hostAPI: https://infisical.example.test/api
+    credentialsRef: {name: fake-credentials, namespace: fake-auth-namespace}
 oidc:
-  enabled: false
-  issuer: ""
+  enabled: true
+  issuer: https://identity.example.test/realms/fake
   scopes: "openid profile email"
   secretPath: /jenkins/oidc
   adminGroup: jenkins-admins
   userGroup: jenkins-users
 github:
-  enabled: false
+  enabled: true
   secretPath: /jenkins/github
   credentialId: github-app
 escapeHatch:
-  pushToInfisical: false
+  pushToInfisical: true
   secretPath: /jenkins/admin
-additionalSecrets: []
+additionalSecrets:
+  - name: fake-user-password
+    secretPath: /jenkins/fake-user-password
+    keys: {username: FAKE_USERNAME, password: FAKE_PASSWORD}
+    jenkinsCredential:
+      type: usernamePassword
+      description: Fake user credential for chart tests
+      scope: global
+  - name: fake-external-cluster
+    secretPath: /jenkins/fake-external-cluster
+    keys: {filename: FAKE_FILENAME, data: FAKE_FILE_DATA}
+    jenkinsCredential:
+      type: secretFile
+      description: Fake external cluster file for chart tests
+      scope: system
 uiRoute:
   enabled: false
   host: ""

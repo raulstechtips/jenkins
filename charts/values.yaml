@@ -30,7 +30,18 @@ github:
 escapeHatch:
   pushToInfisical: false # Enable only when push authentication is configured.
   secretPath: /jenkins/admin # Keep recovery credentials in a separate folder.
-additionalSecrets: [] # Extend pulls with name, secretPath, keys and optional jenkinsCredential.
+# Each entry has name, secretPath, keys and optional jenkinsCredential {type, description, scope?}.
+# Map Secret data keys to Infisical key names in keys.
+# Credential keys: usernamePassword = username/password; secretText = text;
+# secretFile = filename/data; gitHubApp = appID/privateKey. The Secret name is the credential ID.
+additionalSecrets: [] # Extend pulls and optionally create Jenkins credentials.
+# In cluster-config, dev must set jenkins.controller.additionalExistingSecrets to these five entries:
+# - {name: jenkins-oidc, keyName: clientId}
+# - {name: jenkins-oidc, keyName: clientSecret}
+# - {name: jenkins-github, keyName: appId}
+# - {name: jenkins-github, keyName: privateKey}
+# - {name: jenkins-github, keyName: webhookSecret}
+# Keep them out of chart defaults: a missing mounted Secret prevents controller startup.
 # Configure the internal UI route without a source allowlist.
 uiRoute:
   enabled: false # Create a route only when its host and TLS Secret are set.

@@ -82,6 +82,36 @@
         "type": "object",
         "additionalProperties": false,
         "required": ["name", "secretPath", "keys"],
+        "allOf": [
+          {
+            "if": {
+              "required": ["jenkinsCredential"],
+              "properties": { "jenkinsCredential": { "properties": { "type": { "const": "usernamePassword" } } } }
+            },
+            "then": { "properties": { "keys": { "required": ["username", "password"] } } }
+          },
+          {
+            "if": {
+              "required": ["jenkinsCredential"],
+              "properties": { "jenkinsCredential": { "properties": { "type": { "const": "secretText" } } } }
+            },
+            "then": { "properties": { "keys": { "required": ["text"] } } }
+          },
+          {
+            "if": {
+              "required": ["jenkinsCredential"],
+              "properties": { "jenkinsCredential": { "properties": { "type": { "const": "secretFile" } } } }
+            },
+            "then": { "properties": { "keys": { "required": ["filename", "data"] } } }
+          },
+          {
+            "if": {
+              "required": ["jenkinsCredential"],
+              "properties": { "jenkinsCredential": { "properties": { "type": { "const": "gitHubApp" } } } }
+            },
+            "then": { "properties": { "keys": { "required": ["appID", "privateKey"] } } }
+          }
+        ],
         "properties": {
           "name": { "type": "string", "minLength": 1, "maxLength": 253, "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$" },
           "secretPath": { "type": "string", "minLength": 1 },
