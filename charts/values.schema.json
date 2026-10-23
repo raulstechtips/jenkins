@@ -1,0 +1,162 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": true,
+  "definitions": {
+    "secretRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "namespace"],
+      "properties": {
+        "name": { "type": "string" },
+        "namespace": { "type": "string" }
+      }
+    },
+    "stringList": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "middlewares": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "namespace": { "type": "string" }
+        }
+      }
+    }
+  },
+  "properties": {
+    "infisical": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "authRef": { "$ref": "#/definitions/secretRef" },
+        "projectSlug": { "type": "string" },
+        "environmentSlug": { "type": "string" },
+        "push": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hostAPI": { "type": "string" },
+            "credentialsRef": { "$ref": "#/definitions/secretRef" }
+          }
+        }
+      }
+    },
+    "oidc": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "issuer": { "type": "string" },
+        "scopes": { "type": "string", "minLength": 1 },
+        "secretPath": { "type": "string", "minLength": 1 },
+        "adminGroup": { "type": "string", "minLength": 1 },
+        "userGroup": { "type": "string", "minLength": 1 }
+      }
+    },
+    "github": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "secretPath": { "type": "string", "minLength": 1 },
+        "credentialId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "escapeHatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pushToInfisical": { "type": "boolean" },
+        "secretPath": { "type": "string", "minLength": 1 }
+      }
+    },
+    "additionalSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "secretPath", "keys"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 253, "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$" },
+          "secretPath": { "type": "string", "minLength": 1 },
+          "keys": {
+            "type": "object",
+            "minProperties": 1,
+            "propertyNames": { "pattern": "^[-._a-zA-Z0-9]+$" },
+            "additionalProperties": { "type": "string", "minLength": 1 }
+          },
+          "jenkinsCredential": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "description"],
+            "properties": {
+              "type": { "type": "string", "minLength": 1 },
+              "description": { "type": "string" },
+              "scope": { "type": "string", "enum": ["global", "system"] }
+            }
+          }
+        }
+      }
+    },
+    "uiRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "host": { "type": "string" },
+        "tlsSecretName": { "type": "string" },
+        "entryPoints": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+        "ingressClass": { "type": "string", "minLength": 1 },
+        "middlewares": { "$ref": "#/definitions/middlewares" }
+      }
+    },
+    "webhookRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "host": { "type": "string" },
+        "tlsSecretName": { "type": "string" },
+        "entryPoints": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+        "ingressClass": { "type": "string", "minLength": 1 },
+        "middlewares": { "$ref": "#/definitions/middlewares" },
+        "ipStrategyDepth": { "type": "integer", "minimum": 0 },
+        "githubHookSourceRanges": { "$ref": "#/definitions/stringList" },
+        "additionalHookSourceRanges": { "$ref": "#/definitions/stringList" }
+      }
+    },
+    "deployNamespaces": { "$ref": "#/definitions/stringList" },
+    "sharedLibraries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "repo"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "repo": { "type": "string", "minLength": 1 },
+          "defaultVersion": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "organizationFolders": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "owner"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "owner": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "jenkins": { "type": "object", "additionalProperties": true }
+  }
+}

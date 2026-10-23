@@ -1,0 +1,53 @@
+# Later units enable their own features in this complete wrapper fixture.
+infisical:
+  authRef: {name: "", namespace: ""}
+  projectSlug: ""
+  environmentSlug: ""
+  push:
+    hostAPI: ""
+    credentialsRef: {name: "", namespace: ""}
+oidc:
+  enabled: false
+  issuer: ""
+  scopes: "openid profile email"
+  secretPath: /jenkins/oidc
+  adminGroup: jenkins-admins
+  userGroup: jenkins-users
+github:
+  enabled: false
+  secretPath: /jenkins/github
+  credentialId: github-app
+escapeHatch:
+  pushToInfisical: false
+  secretPath: /jenkins/admin
+additionalSecrets: []
+uiRoute:
+  enabled: false
+  host: ""
+  tlsSecretName: ""
+  entryPoints: [websecure]
+  ingressClass: traefik-external
+  middlewares: []
+webhookRoute:
+  enabled: false
+  host: ""
+  tlsSecretName: ""
+  entryPoints: [websecure]
+  ingressClass: traefik-external
+  middlewares: []
+  ipStrategyDepth: 0
+  githubHookSourceRanges:
+    - 9.234.106.48/28
+    - 9.234.98.160/28
+    - 9.234.98.176/28
+    - 192.30.252.0/22
+    - 185.199.108.0/22
+    - 140.82.112.0/20
+    - 143.55.64.0/20
+    - 2a0a:a440::/29
+    - 2606:50c0::/32
+  additionalHookSourceRanges: []
+deployNamespaces: []
+sharedLibraries: []
+organizationFolders: []
+jenkins: {}

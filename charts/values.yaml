@@ -1,0 +1,137 @@
+# Use one Infisical connection for secret delivery.
+infisical:
+  # Use a v1beta1 authentication reference for pulls.
+  authRef:
+    name: "" # Set the authentication object in environment values.
+    namespace: "" # Set its namespace in environment values.
+  projectSlug: "" # Select the project in environment values.
+  environmentSlug: "" # Select the environment in environment values.
+  # The v1alpha1 push resource needs separate authentication fields.
+  push:
+    hostAPI: "" # Set the API address in environment values.
+    # Reference existing universal authentication credentials for pushes.
+    credentialsRef:
+      name: "" # Select the credentials Secret in environment values.
+      namespace: "" # Select the credentials namespace in environment values.
+# Keep provider login off until environment values supply its configuration.
+oidc:
+  enabled: false # Enable only when the identity provider is ready.
+  issuer: "" # Set the realm issuer in environment values.
+  scopes: "openid profile email" # Request identity and profile claims.
+  secretPath: /jenkins/oidc # Read client credentials from a separate folder.
+  adminGroup: jenkins-admins # Give administration rights to this group.
+  userGroup: jenkins-users # Give build rights to this group.
+# Keep GitHub integration off until App credentials exist.
+github:
+  enabled: false # Enable only when the GitHub App is ready.
+  secretPath: /jenkins/github # Read App credentials from a separate folder.
+  credentialId: github-app # Use a stable Jenkins credential identifier.
+# Configure the copy of the generated recovery credentials.
+escapeHatch:
+  pushToInfisical: false # Enable only when push authentication is configured.
+  secretPath: /jenkins/admin # Keep recovery credentials in a separate folder.
+additionalSecrets: [] # Extend pulls with name, secretPath, keys and optional jenkinsCredential.
+# Configure the internal UI route without a source allowlist.
+uiRoute:
+  enabled: false # Create a route only when its host and TLS Secret are set.
+  host: "" # Set the UI host in environment values.
+  tlsSecretName: "" # Select an existing TLS Secret in environment values.
+  entryPoints: [websecure] # Accept TLS traffic.
+  ingressClass: traefik-external # Select the route controller.
+  middlewares: [] # Add environment-specific request middleware.
+# Configure a separate public route for GitHub hooks.
+webhookRoute:
+  enabled: false # Create a route only when its host and TLS Secret are set.
+  host: "" # Set the webhook host in environment values.
+  tlsSecretName: "" # Select an existing TLS Secret in environment values.
+  entryPoints: [websecure] # Accept TLS traffic.
+  ingressClass: traefik-external # Select the route controller.
+  middlewares: [] # Append these after the GitHub allowlist.
+  ipStrategyDepth: 0 # Use the connection source; set 1 behind one trusted proxy.
+  # public: GitHub meta .hooks, refreshed by .github/workflows/github-hooks.yaml
+  githubHookSourceRanges:
+    - 9.234.106.48/28 # Accept this public GitHub hook range.
+    - 9.234.98.160/28 # Accept this public GitHub hook range.
+    - 9.234.98.176/28 # Accept this public GitHub hook range.
+    - 192.30.252.0/22 # Accept this public GitHub hook range.
+    - 185.199.108.0/22 # Accept this public GitHub hook range.
+    - 140.82.112.0/20 # Accept this public GitHub hook range.
+    - 143.55.64.0/20 # Accept this public GitHub hook range.
+    - 2a0a:a440::/29 # Accept this public GitHub hook range.
+    - 2606:50c0::/32 # Accept this public GitHub hook range.
+  additionalHookSourceRanges: [] # Extend the public hook list when necessary.
+deployNamespaces: [] # Grant no deployment rights until namespaces are listed.
+sharedLibraries: [] # Add explicit libraries with name, repo and optional defaultVersion.
+organizationFolders: [] # Add App-owned organization folders with name and owner.
+# Override only the required upstream behavior.
+jenkins:
+  # Configure controller startup from Git.
+  controller:
+    # Pin the direct plugins so restarts use the reviewed versions.
+    installPlugins:
+      - kubernetes:4560.vc25b_83890c34 # Provision build agents as pods.
+      - workflow-aggregator:608.v67378e9d3db_1 # Run Jenkins pipelines.
+      - git:5.11.0 # Check out Git repositories.
+      - github:1.47.0 # Receive GitHub hooks.
+      - github-branch-source:1986.v801e40614d00 # Discover repositories and pull requests.
+      - configuration-as-code:2136.veb_3a_554550b_f # Load Jenkins configuration from Git.
+      - oic-auth:4.731.v4932b_506e767 # Authenticate with the OIDC provider.
+      - matrix-auth:3.3 # Assign group permissions.
+      - github-checks:710.v756946918b_dd # Publish GitHub build checks.
+      - checks-api:422.vc7e8b_51488c6 # Supply the shared checks API.
+      - kubernetes-credentials-provider:1.315.v92008589c044 # Read labelled credential Secrets.
+      - pipeline-utility-steps:3.810.va_7672d206740 # Supply pipeline file utilities.
+      - job-dsl:3732.v9a_c49a_61a_313 # Create organization folders from code.
+      - basic-branch-build-strategies:317.v85b_331d6cc42 # Control branch and pull request builds.
+    installLatestPlugins: false # Resolve plugin dependencies without selecting latest versions.
+    overwritePlugins: true # Replace the plugin set at each controller start.
+    # Keep recovery credentials available when the identity provider is down.
+    admin:
+      createSecret: true # security-relevant default restated on purpose
+      username: admin # security-relevant default restated on purpose
+    # Let the wrapper supply exactly one realm and authorization strategy.
+    JCasC:
+      overwriteConfiguration: true # Replace old XML configuration at startup.
+      securityRealm: "" # Prevent the upstream realm from competing with the wrapper.
+      authorizationStrategy: "" # Prevent a second authorization strategy.
+      defaultConfig: true # security-relevant default restated on purpose
+    # Apply configuration updates through the upstream sidecar.
+    sidecars:
+      configAutoReload:
+        enabled: true # security-relevant default restated on purpose
+  # Use the generic pod for build work without cluster credentials.
+  agent:
+    showRawYaml: false # Keep full pod definitions out of build logs.
+    podName: generic # Give the default build pod a clear name.
+    customJenkinsLabels: [generic] # Let pipelines request the generic agent.
+    # Apply pod-level token and user restrictions.
+    yamlTemplate: |-
+      apiVersion: v1 # Use the Kubernetes Pod API.
+      kind: Pod # Merge these settings into each agent pod.
+      spec: # Restrict the generic build pod.
+        automountServiceAccountToken: false # Do not give build work cluster credentials.
+        securityContext: # Run agent containers without root.
+          runAsNonRoot: true # Reject root containers.
+          runAsUser: 1000 # Use the agent user.
+    # Supply a pinned shell container for basic pipeline commands.
+    additionalContainers:
+      - sideContainerName: shell # Expose a named shell container to pipelines.
+        image: # Pin the multi-platform image index.
+          repository: debian # Supply standard shell tools.
+          tag: "stable-slim@sha256:a717a33469731894e77e912ea7d714e27c2dc38ee6554fd1a3102e92999cfc66" # Prevent tag drift.
+        command: sleep # Keep the container ready for pipeline commands.
+        args: infinity # Keep it alive for the pod lifetime.
+        TTYEnabled: false # Do not allocate an interactive terminal.
+        runAsUser: 1000 # Run shell commands without root.
+  # Allow the credentials provider to watch labelled Secrets.
+  rbac:
+    readSecrets: true # Grant the controller get, watch and list access to Secrets.
+  # Use upstream controller and agent network isolation.
+  networkPolicy:
+    enabled: true # Restrict agent connections with the chart policy.
+  # Keep controller data across pod replacement.
+  persistence:
+    enabled: true # security-relevant default restated on purpose
+  # Do not create a separate default agent ServiceAccount.
+  serviceAccountAgent:
+    create: false # security-relevant default restated on purpose
