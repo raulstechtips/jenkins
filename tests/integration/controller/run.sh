@@ -3,12 +3,12 @@ set -euo pipefail
 
 # Run after helm dependency build charts and docker build. No image is pulled.
 if [[ $# != 1 ]]; then
-  echo "Usage: bash scripts/test-controller-image.sh IMAGE" >&2
+  echo "Usage: bash tests/integration/controller/run.sh IMAGE" >&2
   exit 2
 fi
 IMAGE=$1
-ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-FIXTURES="$ROOT/tests/controller-image"
+FIXTURES=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+ROOT=$(cd "$FIXTURES/../../.." && pwd)
 for tool in docker helm yq; do
   command -v "$tool" >/dev/null || { echo "Required tool: $tool" >&2; exit 1; }
 done
@@ -62,7 +62,7 @@ for config in security github libraries jobs jcasc-default-config; do
   test -s "$WORK/casc/$config.yaml"
 done
 cp "$ROOT/plugins/plugins.txt" "$WORK/plugins.txt"
-cp "$FIXTURES/assert-controller.groovy" "$WORK/assert-controller.groovy"
+cp "$FIXTURES/assert.groovy" "$WORK/assert.groovy"
 printf '%s' controller-test-admin > "$WORK/secrets/chart-admin-username"
 printf '%s' controller-test-password > "$WORK/secrets/chart-admin-password"
 printf '%s' 12345 > "$WORK/secrets/jenkins-github-appId"
@@ -117,7 +117,7 @@ start_and_check() {
     test -n "$field"
     test -n "$crumb"
     curl --fail-with-body -sS --max-time 60 -u "$auth" -b /tmp/test-cookies -H "$field:$crumb" \
-      --data-urlencode script@/test/assert-controller.groovy "$url/scriptText"
+      --data-urlencode script@/test/assert.groovy "$url/scriptText"
   ' > "$WORK/assertions-$phase"; then
     cat "$WORK/assertions-$phase" >&2
     return 1

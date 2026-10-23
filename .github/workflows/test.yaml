@@ -57,7 +57,7 @@ jobs:
             --tag "jenkins-controller:ci-$ARCH" \
             --file plugins/Dockerfile plugins/
       - name: Test controller startup without external network access
-        run: bash scripts/test-controller-image.sh "jenkins-controller:ci-$ARCH"
+        run: bash tests/integration/controller/run.sh "jenkins-controller:ci-$ARCH"
       # Scan and publish these exact images. Do not rebuild after the startup test.
       - name: Save the tested image
         run: docker save --output "$RUNNER_TEMP/controller-$ARCH.tar" "jenkins-controller:ci-$ARCH"
@@ -141,4 +141,4 @@ jobs:
           echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
           "$RUNNER_TEMP/actionlint" .github/workflows/*.yaml
-          shellcheck scripts/*.sh
+          shellcheck scripts/*.sh tests/integration/controller/run.sh

@@ -22,7 +22,8 @@ oci://ghcr.io/raulstechtips/charts/jenkins
 | `plugins/` | `Dockerfile` and `plugins.txt`: build the controller with plugins installed. |
 | `charts/` | The Helm chart. `Chart.yaml`, `Chart.lock`, `values.yaml` and `values.schema.json`. |
 | `charts/templates/` | Our own templates: Infisical secrets, IngressRoutes, the GitHub allowlist Middleware, deployer RBAC and JCasC ConfigMaps. |
-| `charts/tests/` | The helm-unittest test files (`*_test.yaml`). |
+| `charts/tests/` | The helm-unittest unit tests (`*_test.yaml`). They check the rendered templates only. |
+| `tests/integration/controller/` | The integration test for the controller image and the chart together. `run.sh` renders the chart with `values.yaml`, runs the chart's init script, starts the image with no network and runs `assert.groovy` in Jenkins. |
 | `charts/ci/` | Values files for CI. `all-on-values.yaml` turns on all features with fake values. |
 | `.github/workflows/` | `main.yaml` is the pipeline. It calls `test.yaml`, then `scan.yaml`, then `release.yaml`. `retention.yaml` deletes old branch versions. `github-hooks.yaml` refreshes the GitHub hook ranges each week. |
 | `scripts/` | Shell scripts for the workflows: `version.sh`, `retention.sh` and `github-hooks.sh`. |
@@ -141,7 +142,7 @@ Build the image from the same files that CI uses:
 
 ```bash
 docker build -t jenkins-controller:local plugins
-bash scripts/test-controller-image.sh jenkins-controller:local
+bash tests/integration/controller/run.sh jenkins-controller:local
 ```
 
 The image build resolves plugin dependencies. Requested versions are pinned in
