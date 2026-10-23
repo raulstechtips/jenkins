@@ -57,6 +57,51 @@ tests:
       - isNull:
           path: spec.routes[0].middlewares
 
+  - it: puts the UI referrer-policy middleware before the configured middleware
+    release:
+      name: jenkins
+      namespace: jenkins
+    set:
+      uiRoute.enabled: true
+      uiRoute.host: jenkins-ui.example.test
+      uiRoute.tlsSecretName: fake-ui-tls
+      uiRoute.referrerPolicy: same-origin
+      uiRoute.middlewares: [{name: default-headers, namespace: default}]
+    template: templates/ingressroute-ui.yaml
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: spec.routes[0].middlewares
+          value:
+            - {name: jenkins-ui-referrer-policy, namespace: jenkins}
+            - {name: default-headers, namespace: default}
+        documentIndex: 0
+      - isKind:
+          of: Middleware
+        documentIndex: 1
+      - equal:
+          path: metadata
+          value: {name: jenkins-ui-referrer-policy, namespace: jenkins}
+        documentIndex: 1
+      - equal:
+          path: spec
+          value: {headers: {referrerPolicy: same-origin}}
+        documentIndex: 1
+
+  - it: uses only the referrer-policy middleware when no other is configured
+    set:
+      uiRoute.enabled: true
+      uiRoute.host: jenkins-ui.example.test
+      uiRoute.tlsSecretName: fake-ui-tls
+      uiRoute.referrerPolicy: same-origin
+    template: templates/ingressroute-ui.yaml
+    asserts:
+      - equal:
+          path: spec.routes[0].middlewares
+          value: [{name: jenkins-ui-referrer-policy, namespace: NAMESPACE}]
+        documentIndex: 0
+
   - it: restricts the webhook to its path with the allowlist first
     release:
       name: ci

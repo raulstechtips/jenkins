@@ -88,7 +88,7 @@ The values file has two parts.
 | `github` | `enabled: false` | The GitHub App credential (`github-app`) and the webhook secret, from `/jenkins/github`. |
 | `escapeHatch` | `pushToInfisical: false` | Copies the break-glass admin password to Infisical `/jenkins/admin`. |
 | `additionalSecrets` | `[]` | More Infisical secrets. Each entry can become a Jenkins credential, for example a `secretFile` kubeconfig for another cluster. |
-| `uiRoute` | `enabled: false` | The IngressRoute for the Jenkins UI on `<ui-host>`. |
+| `uiRoute` | `enabled: false` | The IngressRoute for the Jenkins UI on `<ui-host>`. `referrerPolicy` (`""`) adds a UI-only headers Middleware before `middlewares`, so its `Referrer-Policy` wins. Set `same-origin` when a shared middleware sets `no-referrer`: Jenkins' reverse-proxy check needs the `Referer` header. |
 | `webhookRoute` | `enabled: false` | The IngressRoute for `/github-webhook/` only on `<webhook-host>`, behind the GitHub allowlist. `githubHookSourceRanges` holds the GitHub meta `.hooks` ranges (chart default, refreshed each week). `additionalHookSourceRanges` (`[]`) adds more ranges. `ipStrategyDepth` (`0`) tells Traefik which IP to check: `0` uses the connection source IP. Set `1` when exactly one trusted proxy, such as Cloudflare, is in front. |
 | `deployNamespaces` | `[]` | One `jenkins-deployer` RoleBinding (ClusterRole `admin`) for each namespace in the list. |
 | `sharedLibraries` | `[]` | Pipeline libraries: `{name, repo, defaultVersion?}`. |

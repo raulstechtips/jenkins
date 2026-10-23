@@ -50,6 +50,8 @@ uiRoute:
   entryPoints: [websecure] # Accept TLS traffic.
   ingressClass: traefik-external # Select the route controller.
   middlewares: [] # Add environment-specific request middleware.
+  # Jenkins' reverse-proxy check needs the browser to send a Referer header.
+  referrerPolicy: "" # Set a UI-only Referrer-Policy (for example same-origin); it overrides the middlewares above.
 # Configure a separate public route for GitHub hooks.
 webhookRoute:
   enabled: false # Create a route only when its host and TLS Secret are set.

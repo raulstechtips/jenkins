@@ -2,6 +2,7 @@
 {{- $host := required "uiRoute.host is required when uiRoute.enabled is true" .Values.uiRoute.host }}
 {{- $tls := required "uiRoute.tlsSecretName is required when uiRoute.enabled is true" .Values.uiRoute.tlsSecretName }}
 {{- $fullname := include "jenkins-wrapper.upstreamFullname" . }}
+{{- $referrer := .Values.uiRoute.referrerPolicy }}
 ---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
@@ -16,13 +17,31 @@ spec:
   routes:
     - match: {{ printf "Host(`%s`)" $host | quote }}
       kind: Rule
-      {{- with .Values.uiRoute.middlewares }}
+      {{- if or $referrer .Values.uiRoute.middlewares }}
       middlewares:
+        {{- /* Traefik changes the response in reverse list order, so the first middleware sets the final header. */}}
+        {{- if $referrer }}
+        - name: {{ $fullname }}-ui-referrer-policy
+          namespace: {{ .Release.Namespace }}
+        {{- end }}
+        {{- with .Values.uiRoute.middlewares }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- end }}
       services:
         - name: {{ $fullname }}
           port: 8080
   tls:
     secretName: {{ $tls | quote }}
+{{- if $referrer }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ $fullname }}-ui-referrer-policy
+  namespace: {{ .Release.Namespace }}
+spec:
+  headers:
+    referrerPolicy: {{ $referrer | quote }}
+{{- end }}
 {{- end }}

@@ -143,7 +143,8 @@
         "tlsSecretName": { "type": "string" },
         "entryPoints": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
         "ingressClass": { "type": "string", "minLength": 1 },
-        "middlewares": { "$ref": "#/definitions/middlewares" }
+        "middlewares": { "$ref": "#/definitions/middlewares" },
+        "referrerPolicy": { "type": "string", "enum": ["", "no-referrer", "no-referrer-when-downgrade", "origin", "origin-when-cross-origin", "same-origin", "strict-origin", "strict-origin-when-cross-origin", "unsafe-url"] }
       }
     },
     "webhookRoute": {
