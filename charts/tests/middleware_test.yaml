@@ -1,0 +1,120 @@
+suite: GitHub webhook allowlist
+templates:
+  - templates/middleware-github-hooks.yaml
+tests:
+  - it: renders nothing by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders no webhook middleware for the UI alone
+    set:
+      uiRoute.enabled: true
+      uiRoute.host: jenkins-ui.example.test
+      uiRoute.tlsSecretName: fake-ui-tls
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: uses exactly the nine GitHub ranges with no IP strategy at depth zero
+    release:
+      name: jenkins
+      namespace: jenkins
+    set:
+      webhookRoute.enabled: true
+      webhookRoute.host: jenkins.example.test
+      webhookRoute.tlsSecretName: fake-webhook-tls
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isAPIVersion:
+          of: traefik.io/v1alpha1
+      - isKind:
+          of: Middleware
+      - equal:
+          path: metadata
+          value: {name: jenkins-github-hooks, namespace: jenkins}
+      - equal:
+          path: spec.ipAllowList
+          value:
+            sourceRange:
+              - 9.234.106.48/28
+              - 9.234.98.160/28
+              - 9.234.98.176/28
+              - 192.30.252.0/22
+              - 185.199.108.0/22
+              - 140.82.112.0/20
+              - 143.55.64.0/20
+              - 2a0a:a440::/29
+              - 2606:50c0::/32
+      - isNull:
+          path: spec.ipAllowList.ipStrategy
+
+  - it: appends extra source ranges after all nine GitHub ranges
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      webhookRoute.additionalHookSourceRanges: [203.0.113.0/24, "2001:db8::/32"]
+    asserts:
+      - equal:
+          path: spec.ipAllowList.sourceRange
+          value:
+            - 9.234.106.48/28
+            - 9.234.98.160/28
+            - 9.234.98.176/28
+            - 192.30.252.0/22
+            - 185.199.108.0/22
+            - 140.82.112.0/20
+            - 143.55.64.0/20
+            - 2a0a:a440::/29
+            - 2606:50c0::/32
+            - 203.0.113.0/24
+            - 2001:db8::/32
+
+  - it: selects forwarded client addresses at depth one
+    values:
+      - ../ci/all-on-values.yaml
+    asserts:
+      - equal:
+          path: spec.ipAllowList.ipStrategy
+          value: {depth: 1}
+
+  - it: removes the strategy when the CI depth is set to zero
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      webhookRoute.ipStrategyDepth: 0
+    asserts:
+      - isNull:
+          path: spec.ipAllowList.ipStrategy
+
+  - it: supports another positive proxy depth
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      webhookRoute.ipStrategyDepth: 2
+    asserts:
+      - equal:
+          path: spec.ipAllowList.ipStrategy
+          value: {depth: 2}
+
+  - it: follows upstream naming for a different release
+    release:
+      name: ci
+      namespace: hooks
+    values:
+      - ../ci/all-on-values.yaml
+    asserts:
+      - equal:
+          path: metadata
+          value: {name: ci-jenkins-github-hooks, namespace: hooks}
+
+  - it: follows the upstream fullname override
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      jenkins.fullnameOverride: custom-controller
+    asserts:
+      - equal:
+          path: metadata.name
+          value: custom-controller-github-hooks

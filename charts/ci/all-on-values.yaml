@@ -36,20 +36,20 @@ additionalSecrets:
       description: Fake external cluster file for chart tests
       scope: system
 uiRoute:
-  enabled: false
-  host: ""
-  tlsSecretName: ""
+  enabled: true
+  host: jenkins-ui.example.test
+  tlsSecretName: fake-ui-tls
   entryPoints: [websecure]
   ingressClass: traefik-external
-  middlewares: []
+  middlewares: [{name: default-headers, namespace: default}]
 webhookRoute:
-  enabled: false
-  host: ""
-  tlsSecretName: ""
+  enabled: true
+  host: jenkins.example.test
+  tlsSecretName: fake-webhook-tls
   entryPoints: [websecure]
   ingressClass: traefik-external
-  middlewares: []
-  ipStrategyDepth: 0
+  middlewares: [{name: default-headers, namespace: default}]
+  ipStrategyDepth: 1
   githubHookSourceRanges:
     - 9.234.106.48/28
     - 9.234.98.160/28
