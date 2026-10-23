@@ -107,6 +107,10 @@ jenkins:
       - basic-branch-build-strategies:317.v85b_331d6cc42 # Control branch and pull request builds.
     installLatestPlugins: false # Resolve plugin dependencies without selecting latest versions.
     overwritePlugins: true # Replace the plugin set at each controller start.
+    # Download plugins straight from a fast mirror; the default redirect often lands on the slow archive site.
+    initContainerEnv:
+      - name: JENKINS_UC_DOWNLOAD_URL # Replace the update-center download URL used by jenkins-plugin-cli.
+        value: https://ftp-nyc.osuosl.org/pub/jenkins/plugins # Mirror base; the tool appends <name>/<version>/<name>.hpi.
     # Keep recovery credentials available when the identity provider is down.
     admin:
       createSecret: true # security-relevant default restated on purpose

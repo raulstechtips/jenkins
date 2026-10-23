@@ -1,0 +1,14 @@
+suite: Controller plugin download
+templates:
+  - charts/jenkins/templates/jenkins-controller-statefulset.yaml
+release:
+  name: jenkins
+  namespace: jenkins
+tests:
+  - it: downloads plugins from the pinned mirror in the init container
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init")].env
+          content:
+            name: JENKINS_UC_DOWNLOAD_URL
+            value: https://ftp-nyc.osuosl.org/pub/jenkins/plugins
