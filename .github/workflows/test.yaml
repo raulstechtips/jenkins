@@ -11,6 +11,62 @@ defaults:
     shell: bash
 
 jobs:
+  image:
+    strategy:
+      fail-fast: false
+      matrix:
+        # The cluster runs only amd64 nodes, so only the amd64 image is built.
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+            helm_sha256: f8180838c23d7c7d797b208861fecb591d9ce1690d8704ed1e4cb8e2add966c1
+            yq_sha256: 654d2943ca1d3be2024089eb4f270f4070f491a0610481d128509b2834870049
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    env:
+      ARCH: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Install chart tools for the controller startup test
+        env:
+          HELM_SHA256: ${{ matrix.helm_sha256 }}
+          YQ_SHA256: ${{ matrix.yq_sha256 }}
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/helm.tar.gz" \
+            "https://get.helm.sh/helm-v3.18.4-linux-$ARCH.tar.gz"
+          echo "$HELM_SHA256  $RUNNER_TEMP/helm.tar.gz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/helm-bin"
+          tar -xzf "$RUNNER_TEMP/helm.tar.gz" -C "$RUNNER_TEMP/helm-bin" --strip-components=1 "linux-$ARCH/helm"
+          echo "$RUNNER_TEMP/helm-bin" >> "$GITHUB_PATH"
+          curl -fsSL -o "$RUNNER_TEMP/yq" \
+            "https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_$ARCH"
+          echo "$YQ_SHA256  $RUNNER_TEMP/yq" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/yq"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Prepare chart dependencies before the offline test
+        run: |
+          helm repo add jenkins https://charts.jenkins.io
+          helm dependency build charts
+      - name: Build the controller on its native architecture
+        run: |
+          docker buildx build --load --provenance=false \
+            --platform "linux/$ARCH" \
+            --tag "jenkins-controller:ci-$ARCH" \
+            --file plugins/Dockerfile plugins/
+      - name: Test controller startup without external network access
+        run: bash tests/integration/controller/run.sh "jenkins-controller:ci-$ARCH"
+      # Scan and publish these exact images. Do not rebuild after the startup test.
+      - name: Save the tested image
+        run: docker save --output "$RUNNER_TEMP/controller-$ARCH.tar" "jenkins-controller:ci-$ARCH"
+      - name: Upload the tested image
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: controller-image-${{ matrix.arch }}
+          path: ${{ runner.temp }}/controller-${{ matrix.arch }}.tar
+          if-no-files-found: error
+          compression-level: 1
+          retention-days: 1
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -34,6 +90,8 @@ jobs:
           # The archive holds the binary. Remove the hook that downloads it again.
           sed -i '/^hooks:/,$d' "$RUNNER_TEMP/helm-unittest/plugin.yaml"
           helm plugin install "$RUNNER_TEMP/helm-unittest"
+      - name: Check the plugin lock
+        run: bash plugins/lock.sh --check
       - name: Test and render the chart
         run: |
           helm repo add jenkins https://charts.jenkins.io
@@ -82,4 +140,4 @@ jobs:
           echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
           "$RUNNER_TEMP/actionlint" .github/workflows/*.yaml
-          shellcheck scripts/*.sh
+          shellcheck scripts/*.sh plugins/lock.sh tests/integration/controller/run.sh

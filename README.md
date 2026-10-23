@@ -7,7 +7,8 @@ This repository contains the Helm chart that installs Jenkins in the cluster.
 The chart wraps the upstream `jenkins` Helm chart `5.9.73` (Jenkins `2.580.1`) as a dependency.
 The chart also adds our own resources: Infisical secrets, Keycloak OIDC login, Traefik IngressRoutes, deployer RBAC and JCasC configuration.
 All Jenkins configuration comes from Git. You do not configure Jenkins in the UI.
-Each push to a valid branch publishes a chart version to GHCR.
+Each successful push build publishes a controller image and a matching chart version to GHCR.
+The chart pins the controller image by digest. Change only the chart version to deploy the pair.
 Argo CD then installs the chart from this OCI address, with values from the `cluster-config` repository:
 
 ```
@@ -18,9 +19,11 @@ oci://ghcr.io/raulstechtips/charts/jenkins
 
 | Path | Contents |
 | --- | --- |
+| `plugins/` | `Dockerfile`, `plugins.txt` (the plugins we choose, pinned), `plugins.lock.txt` (generated: those pins and all dependencies) and `lock.sh` (makes the lock). |
 | `charts/` | The Helm chart. `Chart.yaml`, `Chart.lock`, `values.yaml` and `values.schema.json`. |
 | `charts/templates/` | Our own templates: Infisical secrets, IngressRoutes, the GitHub allowlist Middleware, deployer RBAC and JCasC ConfigMaps. |
-| `charts/tests/` | The helm-unittest test files (`*_test.yaml`). |
+| `charts/tests/` | The helm-unittest unit tests (`*_test.yaml`). They check the rendered templates only. |
+| `tests/integration/controller/` | The integration test for the controller image and the chart together. `run.sh` renders the chart with `values.yaml`, runs the chart's init script, starts the image with no network and runs `assert.groovy` in Jenkins. |
 | `charts/ci/` | Values files for CI. `all-on-values.yaml` turns on all features with fake values. |
 | `.github/workflows/` | `main.yaml` is the pipeline. It calls `test.yaml`, then `scan.yaml`, then `release.yaml`. `retention.yaml` deletes old branch versions. `github-hooks.yaml` refreshes the GitHub hook ranges each week. |
 | `scripts/` | Shell scripts for the workflows: `version.sh`, `retention.sh` and `github-hooks.sh`. |
@@ -29,9 +32,9 @@ oci://ghcr.io/raulstechtips/charts/jenkins
 
 The pipeline has three steps:
 
-1. **Test.** Helm lint, helm-unittest, `helm template` and kubeconform. A check also stops the run if a file contains a private key.
-2. **Scan.** A security scan of the rendered chart.
-3. **Publish.** The workflow makes the version and pushes the chart to GHCR.
+1. **Test.** Helm lint, helm-unittest, `helm template` and kubeconform. Build the controller image for amd64 only, because the cluster runs only amd64 nodes. Start the image without external networking, with fresh and reused Jenkins home volumes, and check its plugins and JCasC. A check also stops the run if a file contains a private key.
+2. **Scan.** Security scans of the rendered chart and the tested amd64 controller image.
+3. **Publish.** Make the release version, push the tested amd64 image, then package and publish the chart with `image.tag` set to `<version>@<digest>`. No chart is published unless its controller image was published first.
 
 ### Branch rule
 
@@ -49,7 +52,7 @@ If the name is bad, the `version` job fails and tells you the correct format.
 
 ### Version format
 
-The workflow makes the chart version. Do not write it into git.
+The workflow makes the shared image and chart version. Do not write it into git.
 
 | Branch | Format | Example |
 | --- | --- | --- |
@@ -63,6 +66,7 @@ The workflow makes the chart version. Do not write it into git.
 The `retention` workflow deletes branch versions that are older than 7 days.
 It keeps all `main` versions.
 For a long-lived install, use a `main` version.
+Controller images are retained because existing charts reference their digests.
 
 ### Weekly GitHub hook ranges
 
@@ -89,7 +93,7 @@ The values file has two parts.
 | `deployNamespaces` | `[]` | One `jenkins-deployer` RoleBinding (ClusterRole `admin`) for each namespace in the list. |
 | `sharedLibraries` | `[]` | Pipeline libraries: `{name, repo, defaultVersion?}`. |
 | `organizationFolders` | `[]` | GitHub organization folders: `{name, owner}`. |
-| `jenkins` | our overrides | Upstream chart values: pinned plugins, controller, agents, persistence. |
+| `jenkins` | our overrides | Upstream chart values: controller image, agents, persistence. Plugin pins live in `plugins/plugins.txt`. |
 | `jenkins.agentAffinity` | `{}` | Kubernetes affinity for both agent pod templates (generic and deployer). Empty allows any node. |
 
 If you turn on a resource and you do not set a required value, `helm template` stops with an error message.
@@ -132,14 +136,43 @@ The Jira sub-tasks of DEVSECOPS-32 give each step click by click.
 
 The deployment and the live checks are in the runbook sub-task (R1 to R4).
 
+## Local controller image test
+
+Build the image from the same files that CI uses:
+
+```bash
+docker build -t jenkins-controller:local plugins
+bash tests/integration/controller/run.sh jenkins-controller:local
+```
+
+The image installs `plugins/plugins.lock.txt`. The lock lists every plugin with an
+exact version, so the build resolves nothing. The published chart selects the
+finished image by digest, so a deployment does not resolve plugins again.
+
+## Plugin lock
+
+`plugins/plugins.txt` lists only the plugins we choose, each pinned.
+`plugins/plugins.lock.txt` is generated from it. Do not edit the lock by hand.
+
+```bash
+bash plugins/lock.sh          # resolve plugins.txt and write the lock (needs Docker)
+bash plugins/lock.sh --check  # check that the lock keeps every pin (CI runs this)
+```
+
+`lock.sh` runs `jenkins-plugin-cli --latest true --no-download` in the Dockerfile
+base image. The pins in `plugins.txt` stay as written. Each dependency gets the
+newest version that is compatible with that Jenkins core.
+The integration test fails if the image does not contain exactly the lock.
+
 ## 7. Runbook
 
 - **Escape hatch.** If the escape-hatch password fails, use the previous version in Infisical history, or restart the controller pod.
 - **New deploy namespace.** The namespace must exist before you add it to `deployNamespaces`.
 - **Revoke deploy rights.** Remove the namespace from `deployNamespaces`. Then run `kubectl -n <ns> delete rolebinding jenkins-deployer`. The Application has prune off, so Argo CD does not delete the old RoleBinding.
-- **Plugin upgrade.** Edit the pin in `charts/values.yaml`. Then raise the chart version. Keep the `pipeline-model-*` pins on one release: the `kubernetes` plugin sets minimum versions for them through optional dependencies.
+- **Plugin upgrade.** To change a plugin we choose, edit its pin in `plugins/plugins.txt`. To update dependencies, change nothing. Then run `bash plugins/lock.sh` and commit `plugins.txt` and `plugins.lock.txt` together. CI builds and tests the image. Deploy the new chart version.
+- **Plugin warnings in the UI.** Do not update plugins in the Jenkins UI. The next restart removes those updates. Run `bash plugins/lock.sh` and ship a new image.
 - **Hook-range PR.** A merged hook-range PR publishes a new chart version. Bump `targetRevision` in `cluster-config`. If you do not, the new GitHub ranges stay blocked.
 - **Infisical change.** The Kubernetes Secret gets the new value within 60 s. Jenkins reads the value only at a JCasC reload or a restart.
-- **Controller start.** Each controller start downloads the pinned plugins. If the update site is down, the restart is blocked.
+- **Controller start.** The image contains the plugins. The init container removes old plugins from the home volume; the controller copies the image's plugin set at startup. No plugins are downloaded at startup. UI-installed plugins do not survive a restart.
 - **`HOOKS_TICKET_KEY`.** This optional repository variable sets the Jira key in the hook-range branch name.
 - **Note for DEVSECOPS-34.** Change-request builds (`env.CHANGE_ID` is set) must never use the `deployer` label.

@@ -1,0 +1,19 @@
+# Only test credentials are used. OIDC discovery is deliberately disabled.
+oidc:
+  enabled: false
+infisical:
+  authRef: {name: mock-auth, namespace: jenkins}
+  projectSlug: mock-project
+  environmentSlug: mock-environment
+github:
+  enabled: true
+sharedLibraries:
+  - name: controller-test-library
+    repo: https://github.com/example/controller-test-library.git
+    defaultVersion: main
+organizationFolders:
+  - name: controller-test-organization
+    owner: controller-test-owner
+jenkins:
+  controller:
+    jenkinsUrl: http://127.0.0.1:8080

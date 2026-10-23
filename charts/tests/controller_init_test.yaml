@@ -1,14 +1,31 @@
-suite: Controller plugin download
+suite: Controller image plugins
 templates:
   - charts/jenkins/templates/jenkins-controller-statefulset.yaml
+  - charts/jenkins/templates/config.yaml
 release:
   name: jenkins
   namespace: jenkins
 tests:
-  - it: downloads plugins from the pinned mirror in the init container
+  - it: uses the same immutable image for initialization and the controller
+    template: charts/jenkins/templates/jenkins-controller-statefulset.yaml
+    set:
+      jenkins.controller.image.tag: test-release@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     asserts:
-      - contains:
-          path: spec.template.spec.initContainers[?(@.name == "init")].env
-          content:
-            name: JENKINS_UC_DOWNLOAD_URL
-            value: https://ftp-nyc.osuosl.org/pub/jenkins/plugins
+      - equal:
+          path: spec.template.spec.initContainers[?(@.name == "init")].image
+          value: ghcr.io/raulstechtips/jenkins-controller:test-release@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      - equal:
+          path: spec.template.spec.containers[?(@.name == "jenkins")].image
+          value: ghcr.io/raulstechtips/jenkins-controller:test-release@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  - it: removes stale home plugins without downloading replacements at startup
+    template: charts/jenkins/templates/config.yaml
+    asserts:
+      - matchRegex:
+          path: data["apply_config.sh"]
+          pattern: 'rm -rf /var/jenkins_home/plugins/\*'
+      - notMatchRegex:
+          path: data["apply_config.sh"]
+          pattern: 'jenkins-plugin-cli|install-plugins.sh|download plugins'
+      - equal:
+          path: data["plugins.txt"]
+          value: ""
