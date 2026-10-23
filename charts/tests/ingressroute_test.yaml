@@ -1,0 +1,200 @@
+suite: Jenkins ingress routes
+templates:
+  - templates/ingressroute-ui.yaml
+  - templates/ingressroute-webhook.yaml
+release:
+  name: jenkins
+tests:
+  - it: renders neither route by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders the UI with only the configured middleware
+    release:
+      name: jenkins
+      namespace: jenkins
+    set:
+      uiRoute.enabled: true
+      uiRoute.host: jenkins-ui.example.test
+      uiRoute.tlsSecretName: fake-ui-tls
+      uiRoute.middlewares: [{name: default-headers, namespace: default}]
+    template: templates/ingressroute-ui.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isAPIVersion:
+          of: traefik.io/v1alpha1
+      - isKind:
+          of: IngressRoute
+      - equal:
+          path: metadata
+          value:
+            name: jenkins-ui
+            namespace: jenkins
+            annotations: {kubernetes.io/ingress.class: traefik-external}
+      - equal:
+          path: spec.entryPoints
+          value: [websecure]
+      - equal:
+          path: spec.routes
+          value:
+            - match: Host(`jenkins-ui.example.test`)
+              kind: Rule
+              middlewares: [{name: default-headers, namespace: default}]
+              services: [{name: jenkins, port: 8080}]
+      - equal:
+          path: spec.tls.secretName
+          value: fake-ui-tls
+
+  - it: adds no UI middleware when none is configured
+    set:
+      uiRoute.enabled: true
+      uiRoute.host: jenkins-ui.example.test
+      uiRoute.tlsSecretName: fake-ui-tls
+    template: templates/ingressroute-ui.yaml
+    asserts:
+      - isNull:
+          path: spec.routes[0].middlewares
+
+  - it: restricts the webhook to its path with the allowlist first
+    release:
+      name: ci
+      namespace: hooks
+    set:
+      webhookRoute.enabled: true
+      webhookRoute.host: jenkins.example.test
+      webhookRoute.tlsSecretName: fake-webhook-tls
+      webhookRoute.middlewares: [{name: default-headers, namespace: default}]
+      jenkins.additionalAgents.deployer.podLabels:
+        jenkins/ci-jenkins-agent: "true"
+    template: templates/ingressroute-webhook.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isAPIVersion:
+          of: traefik.io/v1alpha1
+      - isKind:
+          of: IngressRoute
+      - equal:
+          path: metadata
+          value:
+            name: ci-jenkins-webhook
+            namespace: hooks
+            annotations: {kubernetes.io/ingress.class: traefik-external}
+      - equal:
+          path: spec.entryPoints
+          value: [websecure]
+      - equal:
+          path: spec.routes
+          value:
+            - match: Host(`jenkins.example.test`) && PathPrefix(`/github-webhook/`)
+              kind: Rule
+              middlewares:
+                - {name: ci-jenkins-github-hooks, namespace: hooks}
+                - {name: default-headers, namespace: default}
+              services: [{name: ci-jenkins, port: 8080}]
+      - equal:
+          path: spec.tls.secretName
+          value: fake-webhook-tls
+
+  - it: keeps the webhook allowlist when no extra middleware is configured
+    release:
+      name: jenkins
+      namespace: jenkins
+    set:
+      webhookRoute.enabled: true
+      webhookRoute.host: jenkins.example.test
+      webhookRoute.tlsSecretName: fake-webhook-tls
+    template: templates/ingressroute-webhook.yaml
+    asserts:
+      - equal:
+          path: spec.routes[0].middlewares
+          value: [{name: jenkins-github-hooks, namespace: jenkins}]
+
+  - it: uses the upstream fullname override for both services and route names
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      jenkins.fullnameOverride: custom-controller
+    asserts:
+      - equal:
+          path: metadata.name
+          value: custom-controller-ui
+        template: templates/ingressroute-ui.yaml
+      - equal:
+          path: spec.routes[0].services[0]
+          value: {name: custom-controller, port: 8080}
+        template: templates/ingressroute-ui.yaml
+      - equal:
+          path: metadata.name
+          value: custom-controller-webhook
+        template: templates/ingressroute-webhook.yaml
+      - equal:
+          path: spec.routes[0].services[0]
+          value: {name: custom-controller, port: 8080}
+        template: templates/ingressroute-webhook.yaml
+      - equal:
+          path: spec.routes[0].middlewares[0].name
+          value: custom-controller-github-hooks
+        template: templates/ingressroute-webhook.yaml
+
+  - it: uses the configured entry points and ingress classes for each route
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      uiRoute.entryPoints: [internal-tls]
+      uiRoute.ingressClass: internal-controller
+      webhookRoute.entryPoints: [public-tls]
+      webhookRoute.ingressClass: public-controller
+    asserts:
+      - equal:
+          path: spec.entryPoints
+          value: [internal-tls]
+        template: templates/ingressroute-ui.yaml
+      - equal:
+          path: metadata.annotations["kubernetes.io/ingress.class"]
+          value: internal-controller
+        template: templates/ingressroute-ui.yaml
+      - equal:
+          path: spec.entryPoints
+          value: [public-tls]
+        template: templates/ingressroute-webhook.yaml
+      - equal:
+          path: metadata.annotations["kubernetes.io/ingress.class"]
+          value: public-controller
+        template: templates/ingressroute-webhook.yaml
+
+  - it: requires the UI host
+    set:
+      uiRoute.enabled: true
+    template: templates/ingressroute-ui.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: uiRoute.host is required when uiRoute.enabled is true
+
+  - it: requires the UI TLS Secret
+    set:
+      uiRoute.enabled: true
+      uiRoute.host: jenkins-ui.example.test
+    template: templates/ingressroute-ui.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: uiRoute.tlsSecretName is required when uiRoute.enabled is true
+
+  - it: requires the webhook host
+    set:
+      webhookRoute.enabled: true
+    template: templates/ingressroute-webhook.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: webhookRoute.host is required when webhookRoute.enabled is true
+
+  - it: requires the webhook TLS Secret
+    set:
+      webhookRoute.enabled: true
+      webhookRoute.host: jenkins.example.test
+    template: templates/ingressroute-webhook.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: webhookRoute.tlsSecretName is required when webhookRoute.enabled is true

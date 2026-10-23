@@ -1,0 +1,30 @@
+{{- if .Values.webhookRoute.enabled }}
+{{- $host := required "webhookRoute.host is required when webhookRoute.enabled is true" .Values.webhookRoute.host }}
+{{- $tls := required "webhookRoute.tlsSecretName is required when webhookRoute.enabled is true" .Values.webhookRoute.tlsSecretName }}
+{{- $fullname := include "jenkins-wrapper.upstreamFullname" . }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ $fullname }}-webhook
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    kubernetes.io/ingress.class: {{ .Values.webhookRoute.ingressClass | quote }}
+spec:
+  entryPoints:
+    {{- toYaml .Values.webhookRoute.entryPoints | nindent 4 }}
+  routes:
+    - match: {{ printf "Host(`%s`) && PathPrefix(`/github-webhook/`)" $host | quote }}
+      kind: Rule
+      middlewares:
+        - name: {{ $fullname }}-github-hooks
+          namespace: {{ .Release.Namespace }}
+        {{- with .Values.webhookRoute.middlewares }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      services:
+        - name: {{ $fullname }}
+          port: 8080
+  tls:
+    secretName: {{ $tls | quote }}
+{{- end }}

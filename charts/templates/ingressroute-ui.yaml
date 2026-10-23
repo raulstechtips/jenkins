@@ -1,0 +1,28 @@
+{{- if .Values.uiRoute.enabled }}
+{{- $host := required "uiRoute.host is required when uiRoute.enabled is true" .Values.uiRoute.host }}
+{{- $tls := required "uiRoute.tlsSecretName is required when uiRoute.enabled is true" .Values.uiRoute.tlsSecretName }}
+{{- $fullname := include "jenkins-wrapper.upstreamFullname" . }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ $fullname }}-ui
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    kubernetes.io/ingress.class: {{ .Values.uiRoute.ingressClass | quote }}
+spec:
+  entryPoints:
+    {{- toYaml .Values.uiRoute.entryPoints | nindent 4 }}
+  routes:
+    - match: {{ printf "Host(`%s`)" $host | quote }}
+      kind: Rule
+      {{- with .Values.uiRoute.middlewares }}
+      middlewares:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      services:
+        - name: {{ $fullname }}
+          port: 8080
+  tls:
+    secretName: {{ $tls | quote }}
+{{- end }}

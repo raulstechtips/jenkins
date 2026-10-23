@@ -1,0 +1,383 @@
+suite: Jenkins configuration as code
+templates:
+  - templates/jcasc.yaml
+  - charts/jenkins/templates/jcasc-config.yaml
+release:
+  name: jenkins
+  namespace: jenkins
+# helm-unittest 0.3.1 cannot parse embedded YAML strings.
+# Compare complete data values where practical; parse every section with yq in CLI QA.
+tests:
+  - it: always renders local authentication without optional sections by default
+    template: templates/jcasc.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata
+          value:
+            name: jenkins-jcasc-security
+            namespace: jenkins
+            labels: {jenkins-jenkins-config: "true"}
+      - equal:
+          path: data
+          value:
+            security.yaml: |-
+              jenkins:
+                securityRealm:
+                  local:
+                    allowsSignup: false
+                    enableCaptcha: false
+                    users:
+                      - id: "${chart-admin-username}"
+                        name: "Jenkins Admin"
+                        password: "${chart-admin-password}"
+                authorizationStrategy:
+                  loggedInUsersCanDoAnything:
+                    allowAnonymousRead: false
+
+  - it: renders all four labelled ConfigMaps with CI values
+    template: templates/jcasc.yaml
+    values:
+      - ../ci/all-on-values.yaml
+    asserts:
+      - hasDocuments:
+          count: 4
+      - isAPIVersion:
+          of: v1
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.namespace
+          value: jenkins
+      - equal:
+          path: metadata.labels
+          value: {jenkins-jenkins-config: "true"}
+      - equal:
+          path: metadata.name
+          value: jenkins-jcasc-security
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: jenkins-jcasc-github
+        documentIndex: 1
+      - equal:
+          path: metadata.name
+          value: jenkins-jcasc-libraries
+        documentIndex: 2
+      - equal:
+          path: metadata.name
+          value: jenkins-jcasc-jobs
+        documentIndex: 3
+
+  - it: configures OIDC claims logout escape hatch PKCE and exact group permissions
+    template: templates/jcasc.yaml
+    values:
+      - ../ci/all-on-values.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: data
+          value:
+            security.yaml: |-
+              jenkins:
+                securityRealm:
+                  oic:
+                    serverConfiguration:
+                      wellKnown:
+                        wellKnownOpenIDConfigurationUrl: "https://identity.example.test/realms/fake/.well-known/openid-configuration"
+                        scopesOverride: "openid profile email"
+                    clientId: "${jenkins-oidc-clientId}"
+                    clientSecret: "${jenkins-oidc-clientSecret}"
+                    userNameField: preferred_username
+                    fullNameFieldName: name
+                    emailFieldName: email
+                    groupsFieldName: groups
+                    logoutFromOpenidProvider: true
+                    postLogoutRedirectUrl: "https://jenkins-ui.example.test/OicLogout"
+                    properties:
+                      - escapeHatch:
+                          username: "${chart-admin-username}"
+                          secret: "${chart-admin-password}"
+                          group: "jenkins-admins"
+                      - "pkce"
+                authorizationStrategy:
+                  globalMatrix:
+                    entries:
+                      - group:
+                          name: "jenkins-admins"
+                          permissions: ["Overall/Administer"]
+                      - group:
+                          name: "jenkins-users"
+                          permissions: ["Overall/Read", "Job/Read", "Job/Build", "Job/Cancel", "View/Read"]
+
+  - it: uses configured scopes groups and the explicit Jenkins URL before the route host
+    template: templates/jcasc.yaml
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      oidc.scopes: openid groups
+      oidc.adminGroup: custom-admins
+      oidc.userGroup: custom-users
+      oidc.issuer: https://identity.example.test/realms/fake/
+      jenkins.controller.jenkinsUrl: https://controller.example.test/jenkins/
+    documentIndex: 0
+    asserts:
+      - matchRegex:
+          path: data["security.yaml"]
+          pattern: 'scopesOverride: "openid groups"'
+      - matchRegex:
+          path: data["security.yaml"]
+          pattern: 'group: "custom-admins"'
+      - matchRegex:
+          path: data["security.yaml"]
+          pattern: 'name: "custom-admins"'
+      - matchRegex:
+          path: data["security.yaml"]
+          pattern: 'name: "custom-users"'
+      - matchRegex:
+          path: data["security.yaml"]
+          pattern: 'wellKnownOpenIDConfigurationUrl: "https://identity\.example\.test/realms/fake/\.well-known/openid-configuration"'
+      - matchRegex:
+          path: data["security.yaml"]
+          pattern: 'postLogoutRedirectUrl: "https://controller\.example\.test/jenkins/OicLogout"'
+
+  - it: accepts an explicit Jenkins URL without a UI route host
+    template: templates/jcasc.yaml
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      uiRoute.enabled: false
+      uiRoute.host: ""
+      jenkins.controller.jenkinsUrl: https://controller.example.test
+    documentIndex: 0
+    asserts:
+      - matchRegex:
+          path: data["security.yaml"]
+          pattern: 'postLogoutRedirectUrl: "https://controller\.example\.test/OicLogout"'
+
+  - it: requires an issuer when OIDC is enabled
+    template: templates/jcasc.yaml
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      oidc.issuer: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: oidc.issuer is required when oidc.enabled is true
+
+  - it: requires a post logout address when OIDC is enabled
+    template: templates/jcasc.yaml
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      uiRoute.enabled: false
+      uiRoute.host: ""
+      jenkins.controller.jenkinsUrl: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: uiRoute.host or jenkins.controller.jenkinsUrl is required when oidc.enabled is true
+
+  - it: configures only App and SYSTEM webhook credentials with secret references
+    template: templates/jcasc.yaml
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      github.credentialId: custom-app
+    documentIndex: 1
+    asserts:
+      - equal:
+          path: data
+          value:
+            github.yaml: |-
+              credentials:
+                system:
+                  domainCredentials:
+                    - credentials:
+                        - gitHubApp:
+                            id: "custom-app"
+                            appID: "${jenkins-github-appId}"
+                            privateKey: "${jenkins-github-privateKey}"
+                            description: "GitHub App"
+                        - string:
+                            id: github-webhook-secret
+                            scope: SYSTEM
+                            secret: "${jenkins-github-webhookSecret}"
+                            description: "GitHub webhook secret"
+              unclassified:
+                gitHubPluginConfig:
+                  hookSecretConfigs:
+                    - credentialsId: github-webhook-secret
+
+  - it: configures an explicit modern SCM library without a default version
+    template: templates/jcasc.yaml
+    values:
+      - ../ci/all-on-values.yaml
+    documentIndex: 2
+    asserts:
+      - equal:
+          path: data
+          value:
+            libraries.yaml: |-
+              unclassified:
+                globalLibraries:
+                  libraries:
+                    - name: "fake-library"
+                      implicit: false
+                      allowVersionOverride: true
+                      retriever:
+                        modernSCM:
+                          scm:
+                            git:
+                              remote: "https://github.com/example/fake-library.git"
+                              credentialsId: "github-app"
+
+  - it: renders multiple libraries and only the supplied default version
+    template: templates/jcasc.yaml
+    set:
+      github.credentialId: custom-app
+      sharedLibraries:
+        - {name: first, repo: "https://github.com/example/first.git", defaultVersion: main}
+        - {name: second, repo: "https://github.com/example/second.git"}
+    documentIndex: 1
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: data
+          value:
+            libraries.yaml: |-
+              unclassified:
+                globalLibraries:
+                  libraries:
+                    - name: "first"
+                      implicit: false
+                      allowVersionOverride: true
+                      defaultVersion: "main"
+                      retriever:
+                        modernSCM:
+                          scm:
+                            git:
+                              remote: "https://github.com/example/first.git"
+                              credentialsId: "custom-app"
+                    - name: "second"
+                      implicit: false
+                      allowVersionOverride: true
+                      retriever:
+                        modernSCM:
+                          scm:
+                            git:
+                              remote: "https://github.com/example/second.git"
+                              credentialsId: "custom-app"
+
+  - it: rejects a shared library without a repository
+    template: templates/jcasc.yaml
+    set:
+      sharedLibraries:
+        - name: missing-repo
+    asserts:
+      - failedTemplate:
+          errorMessage: |
+            values don't meet the specifications of the schema(s) in the following chart(s):
+            jenkins:
+            - sharedLibraries.0: repo is required
+
+  - it: renders the approved organization discovery and event build policies
+    template: templates/jcasc.yaml
+    values:
+      - ../ci/all-on-values.yaml
+    documentIndex: 3
+    asserts:
+      - matchRegex:
+          path: data["jobs.yaml"]
+          pattern: "organizationFolder\\('fake-organization'\\)"
+      - matchRegex:
+          path: data["jobs.yaml"]
+          pattern: "repoOwner\\('example'\\)"
+      - matchRegex:
+          path: data["jobs.yaml"]
+          pattern: "credentialsId\\('github-app'\\)"
+      - matchRegex:
+          path: data["jobs.yaml"]
+          pattern: "apiUri\\('https://api.github.com'\\)"
+      - matchRegex:
+          path: data["jobs.yaml"]
+          pattern: 'gitHubBranchDiscovery \{ strategyId\(1\) \}'
+      - matchRegex:
+          path: data["jobs.yaml"]
+          pattern: 'gitHubPullRequestDiscovery \{ strategyId\(1\) \}'
+      - matchRegex:
+          path: data["jobs.yaml"]
+          pattern: 'gitHubForkDiscovery \{ strategyId\(1\); trust \{ gitHubTrustPermissions\(\) \} \}'
+      - matchRegex:
+          path: data["jobs.yaml"]
+          pattern: "projectFactories \\{ workflowMultiBranchProjectFactory \\{ scriptPath\\('Jenkinsfile'\\) \\} \\}"
+      - matchRegex:
+          path: data["jobs.yaml"]
+          pattern: "triggers \\{ periodicFolderTrigger \\{ interval\\('1d'\\) \\} \\}"
+      - matchRegex:
+          path: data["jobs.yaml"]
+          pattern: 'orphanedItemStrategy \{ discardOldItems \{ daysToKeep\(7\) \} \}'
+      - matchRegex:
+          path: data["jobs.yaml"]
+          pattern: "properties \\{ suppressFolderAutomaticTriggering \\{ branches\\('\\.\\*'\\); strategy\\('INDEXING'\\) \\} \\}"
+      - notMatchRegex:
+          path: data["jobs.yaml"]
+          pattern: 'allBranchesSame|suppressAutomaticTriggering'
+      - matchRegex:
+          path: data["jobs.yaml"]
+          pattern: 'buildStrategies \{\s+buildRegularBranches\(\)\s+buildChangeRequests \{ ignoreTargetOnlyChanges\(true\); ignoreUntrustedChanges\(true\) \}'
+      - notMatchRegex:
+          path: data["jobs.yaml"]
+          pattern: 'skipInitialBuildOnFirstBranchIndexing|useScriptSecurity|configure \{'
+
+  - it: renders each organization folder with the configured credential identifier
+    template: templates/jcasc.yaml
+    set:
+      github.credentialId: custom-app
+      organizationFolders:
+        - {name: first, owner: first-owner}
+        - {name: second, owner: second-owner}
+    documentIndex: 1
+    asserts:
+      - hasDocuments:
+          count: 2
+      - matchRegex:
+          path: data["jobs.yaml"]
+          pattern: "(?s)organizationFolder\\('first'\\).*?repoOwner\\('first-owner'\\).*?credentialsId\\('custom-app'\\).*?organizationFolder\\('second'\\).*?repoOwner\\('second-owner'\\).*?credentialsId\\('custom-app'\\)"
+
+  - it: follows upstream fullname overrides for every name and sidecar label
+    template: templates/jcasc.yaml
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      jenkins.fullnameOverride: custom-controller
+    asserts:
+      - equal:
+          path: metadata.labels
+          value: {custom-controller-jenkins-config: "true"}
+      - matchRegex:
+          path: metadata.name
+          pattern: '^custom-controller-jcasc-(security|github|libraries|jobs)$'
+
+  - it: keeps the upstream default ConfigMap free of duplicate security settings
+    template: charts/jenkins/templates/jcasc-config.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - notMatchRegex:
+          path: data["jcasc-default-config.yaml"]
+          pattern: 'securityRealm:|authorizationStrategy:'
+
+  - it: keeps the upstream CI ConfigMap free of duplicate security settings
+    template: charts/jenkins/templates/jcasc-config.yaml
+    values:
+      - ../ci/all-on-values.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - notMatchRegex:
+          path: data["jcasc-default-config.yaml"]
+          pattern: 'securityRealm:|authorizationStrategy:'

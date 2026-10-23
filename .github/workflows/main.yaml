@@ -1,0 +1,30 @@
+name: main
+
+# One pipeline: test the amd64 controller image and the chart, then scan both.
+# Publish the tested image before the matched chart.
+# The scan only warns. A HIGH or CRITICAL finding does not stop the publish.
+on:
+  push:
+    branches: [main, 'feature/**', 'bugfix/**', 'hotfix/**', 'release/**']
+    tags-ignore: ['**']
+  workflow_dispatch:
+
+concurrency: main-${{ github.ref }}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yaml
+
+  scan:
+    needs: test
+    uses: ./.github/workflows/scan.yaml
+
+  publish:
+    needs: scan
+    uses: ./.github/workflows/release.yaml
+    permissions:
+      contents: read
+      packages: write

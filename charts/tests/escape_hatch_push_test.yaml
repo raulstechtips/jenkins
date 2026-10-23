@@ -1,0 +1,129 @@
+suite: Infisical escape hatch push
+templates:
+  - templates/escape-hatch-push.yaml
+release:
+  name: jenkins
+tests:
+  - it: renders nothing by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: copies both admin keys with Replace and keeps remote secrets on deletion
+    release:
+      name: jenkins
+      namespace: jenkins
+    values:
+      - ../ci/all-on-values.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isAPIVersion:
+          of: secrets.infisical.com/v1alpha1
+      - isKind:
+          of: InfisicalPushSecret
+      - equal:
+          path: metadata
+          value: {name: jenkins-escape-hatch, namespace: jenkins}
+      - equal:
+          path: spec.hostAPI
+          value: https://infisical.example.test/api
+      - equal:
+          path: spec.authentication.universalAuth.credentialsRef
+          value: {secretName: fake-credentials, secretNamespace: fake-auth-namespace}
+      - equal:
+          path: spec.resyncInterval
+          value: 1m
+      - equal:
+          path: spec.updatePolicy
+          value: Replace
+      - equal:
+          path: spec.deletionPolicy
+          value: None
+      - equal:
+          path: spec.destination
+          value: {projectSlug: fake-project, environmentSlug: fake-env, secretsPath: /jenkins/admin}
+      - equal:
+          path: spec.push.secret
+          value:
+            secretName: jenkins
+            secretNamespace: jenkins
+            template:
+              includeAllSecrets: false
+              data:
+                JENKINS_ADMIN_USER: '{{ (index . "jenkins-admin-user").Value }}'
+                JENKINS_ADMIN_PASSWORD: '{{ (index . "jenkins-admin-password").Value }}'
+
+  - it: uses the upstream fullname for release ci and a custom destination path
+    release:
+      name: ci
+      namespace: ci
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      escapeHatch.secretPath: /custom/admin
+      jenkins.additionalAgents.deployer.podLabels:
+        jenkins/ci-jenkins-agent: "true"
+    asserts:
+      - equal:
+          path: spec.push.secret.secretName
+          value: ci-jenkins
+      - equal:
+          path: spec.push.secret.secretNamespace
+          value: ci
+      - equal:
+          path: spec.destination.secretsPath
+          value: /custom/admin
+
+  - it: follows the upstream fullname override
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      jenkins.fullnameOverride: custom-controller
+    asserts:
+      - equal:
+          path: spec.push.secret.secretName
+          value: custom-controller
+
+  - it: requires the push API address
+    set:
+      escapeHatch.pushToInfisical: true
+    asserts:
+      - failedTemplate:
+          errorMessage: infisical.push.hostAPI is required when escapeHatch.pushToInfisical is enabled
+
+  - it: requires the push credentials name
+    set:
+      escapeHatch.pushToInfisical: true
+      infisical.push.hostAPI: https://infisical.example.test/api
+    asserts:
+      - failedTemplate:
+          errorMessage: infisical.push.credentialsRef.name is required when escapeHatch.pushToInfisical is enabled
+
+  - it: requires the push credentials namespace
+    set:
+      escapeHatch.pushToInfisical: true
+      infisical.push.hostAPI: https://infisical.example.test/api
+      infisical.push.credentialsRef.name: fake-credentials
+    asserts:
+      - failedTemplate:
+          errorMessage: infisical.push.credentialsRef.namespace is required when escapeHatch.pushToInfisical is enabled
+
+  - it: requires the push project
+    set:
+      escapeHatch.pushToInfisical: true
+      infisical.push.hostAPI: https://infisical.example.test/api
+      infisical.push.credentialsRef: {name: fake-credentials, namespace: fake-auth-namespace}
+    asserts:
+      - failedTemplate:
+          errorMessage: infisical.projectSlug is required when escapeHatch.pushToInfisical is enabled
+
+  - it: requires the push environment
+    set:
+      escapeHatch.pushToInfisical: true
+      infisical.push.hostAPI: https://infisical.example.test/api
+      infisical.push.credentialsRef: {name: fake-credentials, namespace: fake-auth-namespace}
+      infisical.projectSlug: fake-project
+    asserts:
+      - failedTemplate:
+          errorMessage: infisical.environmentSlug is required when escapeHatch.pushToInfisical is enabled

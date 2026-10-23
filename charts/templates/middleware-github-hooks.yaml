@@ -1,0 +1,16 @@
+{{- if .Values.webhookRoute.enabled }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ include "jenkins-wrapper.upstreamFullname" . }}-github-hooks
+  namespace: {{ .Release.Namespace }}
+spec:
+  ipAllowList:
+    sourceRange:
+      {{- concat .Values.webhookRoute.githubHookSourceRanges .Values.webhookRoute.additionalHookSourceRanges | toYaml | nindent 6 }}
+    {{- if gt (int .Values.webhookRoute.ipStrategyDepth) 0 }}
+    ipStrategy:
+      depth: {{ .Values.webhookRoute.ipStrategyDepth }}
+    {{- end }}
+{{- end }}

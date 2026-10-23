@@ -1,0 +1,96 @@
+suite: Deployer namespace access
+templates:
+  - templates/deployer-rbac.yaml
+release:
+  name: jenkins
+  namespace: jenkins
+tests:
+  - it: always creates the token enabled ServiceAccount without default bindings
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isAPIVersion:
+          of: v1
+      - isKind:
+          of: ServiceAccount
+      - equal:
+          path: metadata
+          value: {name: jenkins-deployer, namespace: jenkins}
+      - equal:
+          path: automountServiceAccountToken
+          value: true
+
+  - it: binds admin only in the two CI namespaces to the release ServiceAccount
+    release:
+      namespace: controller
+    values:
+      - ../ci/all-on-values.yaml
+    asserts:
+      - hasDocuments:
+          count: 3
+      - equal:
+          path: metadata
+          value: {name: jenkins-deployer, namespace: controller}
+        documentIndex: 0
+      - isAPIVersion:
+          of: rbac.authorization.k8s.io/v1
+        documentIndex: 1
+      - isKind:
+          of: RoleBinding
+        documentIndex: 1
+      - equal:
+          path: metadata
+          value: {name: jenkins-deployer, namespace: a}
+        documentIndex: 1
+      - equal:
+          path: roleRef
+          value: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: admin}
+        documentIndex: 1
+      - equal:
+          path: subjects
+          value: [{kind: ServiceAccount, name: jenkins-deployer, namespace: controller}]
+        documentIndex: 1
+      - isAPIVersion:
+          of: rbac.authorization.k8s.io/v1
+        documentIndex: 2
+      - isKind:
+          of: RoleBinding
+        documentIndex: 2
+      - equal:
+          path: metadata
+          value: {name: jenkins-deployer, namespace: b}
+        documentIndex: 2
+      - equal:
+          path: roleRef
+          value: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: admin}
+        documentIndex: 2
+      - equal:
+          path: subjects
+          value: [{kind: ServiceAccount, name: jenkins-deployer, namespace: controller}]
+        documentIndex: 2
+
+  - it: rejects another release without its NetworkPolicy pod label
+    release:
+      name: other
+    asserts:
+      - failedTemplate:
+          errorMessage: jenkins.additionalAgents.deployer.podLabels must contain jenkins/other-jenkins-agent
+
+  - it: accepts another release when its NetworkPolicy pod label is supplied
+    release:
+      name: other
+    set:
+      jenkins.additionalAgents.deployer.podLabels:
+        jenkins/other-jenkins-agent: "true"
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ServiceAccount
+
+  - it: checks the configured generic component in the required pod label
+    set:
+      jenkins.agent.componentName: custom-agent
+    asserts:
+      - failedTemplate:
+          errorMessage: jenkins.additionalAgents.deployer.podLabels must contain jenkins/jenkins-custom-agent
