@@ -1,6 +1,7 @@
 name: main
 
-# One pipeline: test, then scan, then publish.
+# One pipeline: test both image architectures and the chart, then scan both.
+# Publish the tested images as one multiarch release before the matched chart.
 # The scan only warns. A HIGH or CRITICAL finding does not stop the publish.
 on:
   push:

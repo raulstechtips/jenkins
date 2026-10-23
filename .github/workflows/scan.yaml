@@ -11,6 +11,59 @@ defaults:
     shell: bash
 
 jobs:
+  image:
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ARCH: ${{ matrix.arch }}
+    steps:
+      - name: Download the tested image
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: controller-image-${{ matrix.arch }}
+          path: ${{ runner.temp }}/images
+      - name: Install Trivy
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/trivy.tar.gz" \
+            https://github.com/aquasecurity/trivy/releases/download/v0.70.0/trivy_0.70.0_Linux-64bit.tar.gz
+          echo "8b4376d5d6befe5c24d503f10ff136d9e0c49f9127a4279fd110b727929a5aa9  $RUNNER_TEMP/trivy.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/trivy.tar.gz" -C "$RUNNER_TEMP" trivy
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Scan the tested controller image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: linux/${{ matrix.arch }}
+        with:
+          version: v0.70.0
+          skip-setup-trivy: 'true'
+          cache: 'false'
+          scan-type: image
+          input: ${{ runner.temp }}/images/controller-${{ matrix.arch }}.tar
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+          format: json
+          output: ${{ runner.temp }}/trivy-image.json
+      - name: Report image scan findings without secret values
+        run: |
+          VULNERABILITIES=$(jq '[.Results[]?.Vulnerabilities[]?] | length' "$RUNNER_TEMP/trivy-image.json")
+          SECRETS=$(jq '[.Results[]?.Secrets[]?] | length' "$RUNNER_TEMP/trivy-image.json")
+          if [ "$VULNERABILITIES" -gt 0 ] || [ "$SECRETS" -gt 0 ]; then
+            echo "::warning::Trivy linux/$ARCH: $VULNERABILITIES vulnerabilities, $SECRETS possible secrets"
+          fi
+          {
+            echo "### Trivy linux/$ARCH: HIGH or CRITICAL findings"
+            echo "Vulnerabilities: $VULNERABILITIES"
+            echo "Possible secrets: $SECRETS (values are not printed)"
+            echo '```text'
+            jq -r '.Results[]?.Vulnerabilities[]? | [.VulnerabilityID, .PkgName, .InstalledVersion, (.FixedVersion // ""), .Severity] | @tsv' "$RUNNER_TEMP/trivy-image.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   trivy:
     runs-on: ubuntu-latest
     timeout-minutes: 15

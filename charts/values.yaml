@@ -82,35 +82,13 @@ organizationFolders: [] # Add App-owned organization folders with name and owner
 jenkins:
   # Configure controller startup from Git.
   controller:
-    # Pin the direct plugins so restarts use the reviewed versions.
-    installPlugins:
-      - kubernetes:4560.vc25b_83890c34 # Provision build agents as pods.
-      - workflow-aggregator:608.v67378e9d3db_1 # Run Jenkins pipelines.
-      # Keep the Declarative plugins on one release: optional kubernetes dependencies need 2.2277 or later.
-      - pipeline-model-definition:2.2277.v00573e73ddf1 # Run Declarative pipelines.
-      - pipeline-model-api:2.2277.v00573e73ddf1 # Match the Declarative release.
-      - pipeline-model-extensions:2.2277.v00573e73ddf1 # Match the Declarative release.
-      - pipeline-stage-tags-metadata:2.2277.v00573e73ddf1 # Match the Declarative release.
-      - pipeline-stage-step:322.vecffa_99f371c # Meet the Declarative extensions minimum.
-      - workflow-durable-task-step:1464.v2d3f5c68f84c # Meet the kubernetes plugin minimum.
-      - git:5.11.0 # Check out Git repositories.
-      - github:1.47.0 # Receive GitHub hooks.
-      - github-branch-source:1986.v801e40614d00 # Discover repositories and pull requests.
-      - configuration-as-code:2136.veb_3a_554550b_f # Load Jenkins configuration from Git.
-      - oic-auth:4.731.v4932b_506e767 # Authenticate with the OIDC provider.
-      - matrix-auth:3.3 # Assign group permissions.
-      - github-checks:710.v756946918b_dd # Publish GitHub build checks.
-      - checks-api:422.vc7e8b_51488c6 # Supply the shared checks API.
-      - kubernetes-credentials-provider:1.315.v92008589c044 # Read labelled credential Secrets.
-      - pipeline-utility-steps:3.810.va_7672d206740 # Supply pipeline file utilities.
-      - job-dsl:3732.v9a_c49a_61a_313 # Create organization folders from code.
-      - basic-branch-build-strategies:317.v85b_331d6cc42 # Control branch and pull request builds.
-    installLatestPlugins: false # Resolve plugin dependencies without selecting latest versions.
-    overwritePlugins: true # Replace the plugin set at each controller start.
-    # Download plugins straight from a fast mirror; the default redirect often lands on the slow archive site.
-    initContainerEnv:
-      - name: JENKINS_UC_DOWNLOAD_URL # Replace the update-center download URL used by jenkins-plugin-cli.
-        value: https://ftp-nyc.osuosl.org/pub/jenkins/plugins # Mirror base; the tool appends <name>/<version>/<name>.hpi.
+    # CI packages the chart with its matching image tag and digest.
+    image:
+      registry: ghcr.io # Pull the tested controller from GHCR.
+      repository: raulstechtips/jenkins-controller # Built from plugins/Dockerfile.
+      tag: "" # Release packaging supplies <version>@sha256:<digest>.
+    installPlugins: false # Plugins are already installed in the controller image.
+    overwritePlugins: true # Clear old PVC plugins before copying the image's plugin set.
     # Keep recovery credentials available when the identity provider is down.
     admin:
       createSecret: true # security-relevant default restated on purpose
