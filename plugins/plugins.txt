@@ -1,12 +1,5 @@
 kubernetes:4560.vc25b_83890c34
 workflow-aggregator:608.v67378e9d3db_1
-# Kubernetes requires these Declarative Pipeline dependency versions.
-pipeline-model-definition:2.2277.v00573e73ddf1
-pipeline-model-api:2.2277.v00573e73ddf1
-pipeline-model-extensions:2.2277.v00573e73ddf1
-pipeline-stage-tags-metadata:2.2277.v00573e73ddf1
-pipeline-stage-step:322.vecffa_99f371c
-workflow-durable-task-step:1464.v2d3f5c68f84c
 git:5.11.0
 github:1.47.0
 github-branch-source:1986.v801e40614d00

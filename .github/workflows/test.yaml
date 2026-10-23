@@ -15,15 +15,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # The cluster runs only amd64 nodes, so only the amd64 image is built.
         include:
           - arch: amd64
             runner: ubuntu-24.04
             helm_sha256: f8180838c23d7c7d797b208861fecb591d9ce1690d8704ed1e4cb8e2add966c1
             yq_sha256: 654d2943ca1d3be2024089eb4f270f4070f491a0610481d128509b2834870049
-          - arch: arm64
-            runner: ubuntu-24.04-arm
-            helm_sha256: c0a45e67eef0c7416a8a8c9e9d5d2d30d70e4f4d3f7bea5de28241fffa8f3b89
-            yq_sha256: ceea73d4c86f2e5c91926ee0639157121f5360da42beeb8357783d79c2cc6a1d
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     env:
@@ -93,6 +90,8 @@ jobs:
           # The archive holds the binary. Remove the hook that downloads it again.
           sed -i '/^hooks:/,$d' "$RUNNER_TEMP/helm-unittest/plugin.yaml"
           helm plugin install "$RUNNER_TEMP/helm-unittest"
+      - name: Check the plugin lock
+        run: bash plugins/lock.sh --check
       - name: Test and render the chart
         run: |
           helm repo add jenkins https://charts.jenkins.io
@@ -141,4 +140,4 @@ jobs:
           echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
           "$RUNNER_TEMP/actionlint" .github/workflows/*.yaml
-          shellcheck scripts/*.sh tests/integration/controller/run.sh
+          shellcheck scripts/*.sh plugins/lock.sh tests/integration/controller/run.sh

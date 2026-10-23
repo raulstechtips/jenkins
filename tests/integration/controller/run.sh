@@ -62,6 +62,7 @@ for config in security github libraries jobs jcasc-default-config; do
   test -s "$WORK/casc/$config.yaml"
 done
 cp "$ROOT/plugins/plugins.txt" "$WORK/plugins.txt"
+cp "$ROOT/plugins/plugins.lock.txt" "$WORK/plugins.lock.txt"
 cp "$FIXTURES/assert.groovy" "$WORK/assert.groovy"
 printf '%s' controller-test-admin > "$WORK/secrets/chart-admin-username"
 printf '%s' controller-test-password > "$WORK/secrets/chart-admin-password"
