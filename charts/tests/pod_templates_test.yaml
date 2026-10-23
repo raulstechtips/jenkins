@@ -28,6 +28,30 @@ tests:
           path: data["jcasc-default-config.yaml"]
           pattern: '(?s)- name: "deployer".*?yaml: \|-\n.*?automountServiceAccountToken: true\n\s+securityContext:\n\s+runAsNonRoot: true\n\s+runAsUser: 1000'
 
+  - it: adds no agent affinity by default
+    asserts:
+      - notMatchRegex:
+          path: data["jcasc-default-config.yaml"]
+          pattern: 'nodeAffinity'
+
+  - it: applies jenkins.agentAffinity to both agent pod templates
+    set:
+      jenkins.agentAffinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values: [node-a, node-b]
+    asserts:
+      - matchRegex:
+          path: data["jcasc-default-config.yaml"]
+          pattern: '(?s)- name: "generic".*?yaml: \|-\n.*?runAsUser: 1000[^\n]*\n\s+affinity:[^\n]*\n\s+nodeAffinity:.*?- node-a\n\s+- node-b.*?- name: "deployer"'
+      - matchRegex:
+          path: data["jcasc-default-config.yaml"]
+          pattern: '(?s)- name: "deployer".*?yaml: \|-\n.*?runAsUser: 1000\n\s+affinity:\n\s+nodeAffinity:.*?- node-a\n\s+- node-b'
+
   - it: uses the pinned kubectl tools container for the deployer
     asserts:
       - matchRegex:

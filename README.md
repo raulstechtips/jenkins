@@ -90,6 +90,7 @@ The values file has two parts.
 | `sharedLibraries` | `[]` | Pipeline libraries: `{name, repo, defaultVersion?}`. |
 | `organizationFolders` | `[]` | GitHub organization folders: `{name, owner}`. |
 | `jenkins` | our overrides | Upstream chart values: pinned plugins, controller, agents, persistence. |
+| `jenkins.agentAffinity` | `{}` | Kubernetes affinity for both agent pod templates (generic and deployer). Empty allows any node. |
 
 If you turn on a resource and you do not set a required value, `helm template` stops with an error message.
 
@@ -136,7 +137,7 @@ The deployment and the live checks are in the runbook sub-task (R1 to R4).
 - **Escape hatch.** If the escape-hatch password fails, use the previous version in Infisical history, or restart the controller pod.
 - **New deploy namespace.** The namespace must exist before you add it to `deployNamespaces`.
 - **Revoke deploy rights.** Remove the namespace from `deployNamespaces`. Then run `kubectl -n <ns> delete rolebinding jenkins-deployer`. The Application has prune off, so Argo CD does not delete the old RoleBinding.
-- **Plugin upgrade.** Edit the pin in `charts/values.yaml`. Then raise the chart version.
+- **Plugin upgrade.** Edit the pin in `charts/values.yaml`. Then raise the chart version. Keep the `pipeline-model-*` pins on one release: the `kubernetes` plugin sets minimum versions for them through optional dependencies.
 - **Hook-range PR.** A merged hook-range PR publishes a new chart version. Bump `targetRevision` in `cluster-config`. If you do not, the new GitHub ranges stay blocked.
 - **Infisical change.** The Kubernetes Secret gets the new value within 60 s. Jenkins reads the value only at a JCasC reload or a restart.
 - **Controller start.** Each controller start downloads the pinned plugins. If the update site is down, the restart is blocked.

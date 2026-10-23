@@ -121,6 +121,8 @@ jenkins:
     sidecars:
       configAutoReload:
         enabled: true # security-relevant default restated on purpose
+  # Place both agent pod templates (generic and deployer) on chosen nodes.
+  agentAffinity: {} # Kubernetes affinity read by the agent yamlTemplates; empty allows any node.
   # Use the generic pod for build work without cluster credentials.
   agent:
     showRawYaml: false # Keep full pod definitions out of build logs.
@@ -135,6 +137,10 @@ jenkins:
         securityContext: # Run agent containers without root.
           runAsNonRoot: true # Reject root containers.
           runAsUser: 1000 # Use the agent user.
+        {{- with .Values.agentAffinity }}
+        affinity: # Place the pod with jenkins.agentAffinity.
+          {{- toYaml . | nindent 4 }}
+        {{- end }}
     # Supply a pinned shell container for basic pipeline commands.
     additionalContainers:
       - sideContainerName: shell # Expose a named shell container to pipelines.
@@ -166,6 +172,10 @@ jenkins:
           securityContext:
             runAsNonRoot: true
             runAsUser: 1000
+          {{- with .Values.agentAffinity }}
+          affinity:
+            {{- toYaml . | nindent 4 }}
+          {{- end }}
       # Supply kubectl and Helm for deployment stages.
       additionalContainers:
         - sideContainerName: kubectl # Expose deployment tools to pipelines.
