@@ -1,0 +1,166 @@
+{{- $fullname := include "jenkins-wrapper.upstreamFullname" . -}}
+{{- $label := include "jenkins-wrapper.jcascLabel" . -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-jcasc-security
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{ $label }}: "true"
+data:
+  security.yaml: |-
+    jenkins:
+      securityRealm:
+        {{- if .Values.oidc.enabled }}
+        {{- $issuer := required "oidc.issuer is required when oidc.enabled is true" .Values.oidc.issuer }}
+        {{- $jenkinsUrl := .Values.jenkins.controller.jenkinsUrl }}
+        {{- if not $jenkinsUrl }}
+        {{- $host := required "uiRoute.host or jenkins.controller.jenkinsUrl is required when oidc.enabled is true" .Values.uiRoute.host }}
+        {{- $jenkinsUrl = printf "https://%s" $host }}
+        {{- end }}
+        oic:
+          serverConfiguration:
+            wellKnown:
+              wellKnownOpenIDConfigurationUrl: {{ printf "%s/.well-known/openid-configuration" (trimSuffix "/" $issuer) | quote }}
+              scopesOverride: {{ .Values.oidc.scopes | quote }}
+          clientId: "${jenkins-oidc-clientId}"
+          clientSecret: "${jenkins-oidc-clientSecret}"
+          userNameField: preferred_username
+          fullNameFieldName: name
+          emailFieldName: email
+          groupsFieldName: groups
+          logoutFromOpenidProvider: true
+          postLogoutRedirectUrl: {{ printf "%s/OicLogout" (trimSuffix "/" $jenkinsUrl) | quote }}
+          properties:
+            - escapeHatch:
+                username: "${chart-admin-username}"
+                secret: "${chart-admin-password}"
+                group: {{ .Values.oidc.adminGroup | quote }}
+            - "pkce"
+      authorizationStrategy:
+        globalMatrix:
+          entries:
+            - group:
+                name: {{ .Values.oidc.adminGroup | quote }}
+                permissions: ["Overall/Administer"]
+            - group:
+                name: {{ .Values.oidc.userGroup | quote }}
+                permissions: ["Overall/Read", "Job/Read", "Job/Build", "Job/Cancel", "View/Read"]
+        {{- else }}
+        local:
+          allowsSignup: false
+          enableCaptcha: false
+          users:
+            - id: "${chart-admin-username}"
+              name: "Jenkins Admin"
+              password: "${chart-admin-password}"
+      authorizationStrategy:
+        loggedInUsersCanDoAnything:
+          allowAnonymousRead: false
+        {{- end }}
+{{- if .Values.github.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-jcasc-github
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{ $label }}: "true"
+data:
+  github.yaml: |-
+    credentials:
+      system:
+        domainCredentials:
+          - credentials:
+              - gitHubApp:
+                  id: {{ .Values.github.credentialId | quote }}
+                  appID: "${jenkins-github-appId}"
+                  privateKey: "${jenkins-github-privateKey}"
+                  description: "GitHub App"
+              - string:
+                  id: github-webhook-secret
+                  scope: SYSTEM
+                  secret: "${jenkins-github-webhookSecret}"
+                  description: "GitHub webhook secret"
+    unclassified:
+      gitHubPluginConfig:
+        hookSecretConfigs:
+          - credentialsId: github-webhook-secret
+{{- end }}
+{{- with .Values.sharedLibraries }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-jcasc-libraries
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{ $label }}: "true"
+data:
+  libraries.yaml: |-
+    unclassified:
+      globalLibraries:
+        libraries:
+          {{- range . }}
+          - name: {{ .name | quote }}
+            implicit: false
+            allowVersionOverride: true
+            {{- with .defaultVersion }}
+            defaultVersion: {{ . | quote }}
+            {{- end }}
+            retriever:
+              modernSCM:
+                scm:
+                  git:
+                    remote: {{ required "sharedLibraries.repo is required for each library" .repo | quote }}
+                    credentialsId: {{ $.Values.github.credentialId | quote }}
+          {{- end }}
+{{- end }}
+{{- with .Values.organizationFolders }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-jcasc-jobs
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{ $label }}: "true"
+data:
+  jobs.yaml: |-
+    jobs:
+      - script: |
+          {{- range . }}
+          organizationFolder('{{ .name | replace "\\" "\\\\" | replace "'" "\\'" }}') {
+            organizations {
+              github {
+                repoOwner('{{ .owner | replace "\\" "\\\\" | replace "'" "\\'" }}')
+                apiUri('https://api.github.com')
+                credentialsId('{{ $.Values.github.credentialId | replace "\\" "\\\\" | replace "'" "\\'" }}')
+                traits {
+                  gitHubBranchDiscovery { strategyId(1) }
+                  gitHubPullRequestDiscovery { strategyId(1) }
+                  gitHubForkDiscovery { strategyId(1); trust { gitHubTrustPermissions() } }
+                }
+              }
+            }
+            projectFactories { workflowMultiBranchProjectFactory { scriptPath('Jenkinsfile') } }
+            triggers { periodicFolderTrigger { interval('1d') } }
+            orphanedItemStrategy { discardOldItems { daysToKeep(7) } }
+            strategy {
+              allBranchesSame {
+                props {
+                  suppressAutomaticTriggering {
+                    strategy('INDEXING')
+                    triggeredBranchesRegex('.*')
+                  }
+                }
+              }
+            }
+            buildStrategies {
+              buildRegularBranches()
+              buildChangeRequests { ignoreTargetOnlyChanges(true); ignoreUntrustedChanges(true) }
+            }
+          }
+          {{- end }}
+{{- end }}

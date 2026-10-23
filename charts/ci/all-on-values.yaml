@@ -62,6 +62,10 @@ webhookRoute:
     - 2606:50c0::/32
   additionalHookSourceRanges: []
 deployNamespaces: [a, b]
-sharedLibraries: []
-organizationFolders: []
+sharedLibraries:
+  - name: fake-library
+    repo: https://github.com/example/fake-library.git
+organizationFolders:
+  - name: fake-organization
+    owner: example
 jenkins: {}
