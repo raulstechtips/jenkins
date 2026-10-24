@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Delete dated branch-build versions (every tag made by CI or Jenkins branch and PR builds) older than 7 days from GHCR.
 # Covers two packages: the chart (charts/<name>) and the controller image (jenkins-controller).
+# Pass 1 fetches, validates and decides for BOTH packages without any DELETE call. Pass 2 deletes only if pass 1 passed for every package.
 # Keep everything else: untagged, main, release, manual and unrecognised tags.
 # Usage: scripts/retention.sh --dry-run|--apply   (reads GH_TOKEN for gh)
 # Test hooks (offline): RETENTION_VERSIONS_FILE=<json file> skips the list API call;
@@ -33,30 +34,31 @@ else
   now="$(jq -n 'now | floor')"
 fi
 
-# Apply the retention rules to one package. Exit 1 on any failure (fail closed).
-process_package() {
-  local pkg="$1"
+# Pass 1 for one package: fetch, validate and write the decisions to "$work/<index>.decisions.txt".
+# Never deletes. Exit 1 on any failure (fail closed). A 404 package is skipped.
+prepare_package() {
+  local index="$1" pkg="$2"
   local display="${pkg//%2F//}"
   local owner_path="/${PKG_OWNER_PATH}/packages/container/${pkg}/versions"
+  local raw="$work/$index.raw.json" versions="$work/$index.versions.json"
 
-  echo "Package ${display}"
   if [ -n "${RETENTION_VERSIONS_FILE:-}" ]; then
-    cp "$RETENTION_VERSIONS_FILE" "$work/raw.json"
+    cp "$RETENTION_VERSIONS_FILE" "$raw"
   else
-    if ! gh api --paginate "${owner_path}?per_page=100" >"$work/raw.json" 2>"$work/err.txt"; then
+    if ! gh api --paginate "${owner_path}?per_page=100" >"$raw" 2>"$work/err.txt"; then
       if grep -q 'HTTP 404' "$work/err.txt"; then
         echo "::notice::Package ${display} not found (HTTP 404). Nothing to clean."
         return 0
       fi
       cat "$work/err.txt" >&2
-      echo "::error::GitHub API list call failed for ${display}." >&2
+      echo "::error::GitHub API list call failed for ${display}. Nothing deleted." >&2
       exit 1
     fi
   fi
 
   # --paginate prints one JSON array per page: merge them. Fail closed on bad JSON.
-  if ! jq -s 'add // []' "$work/raw.json" >"$work/versions.json" 2>/dev/null; then
-    echo "::error::Version list is not valid JSON. Nothing deleted." >&2
+  if ! jq -s 'add // []' "$raw" >"$versions" 2>/dev/null; then
+    echo "::error::Version list of ${display} is not valid JSON. Nothing deleted." >&2
     exit 1
   fi
 
@@ -66,12 +68,12 @@ process_package() {
         and (.created_at | type == "string"
              and ((sub("\\.[0-9]+Z$"; "Z") | try fromdateiso8601 catch null) != null))
         and ((.metadata.container.tags // null) | type == "array"))' \
-      "$work/versions.json" >/dev/null 2>&1; then
-    echo "::error::Malformed version data (missing id, created_at or tags). Nothing deleted." >&2
+      "$versions" >/dev/null 2>&1; then
+    echo "::error::Malformed version data of ${display} (missing id, created_at or tags). Nothing deleted." >&2
     exit 1
   fi
 
-  jq -r --argjson now "$now" --arg re "$BRANCH_BUILD_RE" --arg guard "$MAIN_GUARD_RE" --argjson max "$MAX_AGE_SECONDS" '
+  if ! jq -r --argjson now "$now" --arg re "$BRANCH_BUILD_RE" --arg guard "$MAIN_GUARD_RE" --argjson max "$MAX_AGE_SECONDS" '
     .[] |
     (.metadata.container.tags) as $tags |
     (.created_at | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) as $created |
@@ -87,26 +89,57 @@ process_package() {
        ["KEEP", "dated branch build newer than 7 days"]
      end) as $d |
     [$d[0], (.id | tostring), ($tags | join(",")), .created_at, $d[1]] | join("|")' \
-    "$work/versions.json" >"$work/decisions.txt"
+    "$versions" >"$work/$index.decisions.txt"; then
+    echo "::error::Could not compute decisions for ${display}. Nothing deleted." >&2
+    exit 1
+  fi
+}
 
-  local decision id tags created reason
+# Pass 2 for one package: print the stored decisions and delete when --apply is set.
+apply_package() {
+  local index="$1" pkg="$2"
+  local display="${pkg//%2F//}"
+  local owner_path="/${PKG_OWNER_PATH}/packages/container/${pkg}/versions"
+  local decisions="$work/$index.decisions.txt"
+  local decision id tags created reason deleted=0 candidates=0
+
+  [ -f "$decisions" ] || return 0
+  echo "Package ${display}"
   while IFS='|' read -r decision id tags created reason; do
     if [ "$decision" = "KEEP" ] && [ -z "$tags" ]; then
       echo "::notice::KEEP id=$id untagged created=$created - $reason"
     elif [ "$decision" = "KEEP" ]; then
       echo "KEEP id=$id tags=$tags created=$created - $reason"
     elif [ "$mode" = "--dry-run" ]; then
+      candidates=$((candidates + 1))
       echo "would-delete id=$id tags=$tags created=$created - $reason (dry run, no API call)"
     else
       echo "DELETE id=$id tags=$tags created=$created - $reason"
       if ! gh api --method DELETE "${owner_path}/${id}"; then
-        echo "::error::DELETE failed for version $id of ${display}" >&2
+        echo "::error::DELETE failed for version $id of ${display}. Deleted ${deleted} version(s) of this package before the failure." >&2
         exit 1
       fi
+      deleted=$((deleted + 1))
     fi
-  done <"$work/decisions.txt"
+  done <"$decisions"
+
+  if [ "$mode" = "--dry-run" ]; then
+    echo "Summary ${display}: ${candidates} version(s) would be deleted, none deleted (dry run)."
+  else
+    echo "Summary ${display}: ${deleted} version(s) deleted."
+  fi
 }
 
+# Pass 1: no DELETE call before every package is fetched and validated.
+index=0
 for package in "${PACKAGES[@]}"; do
-  process_package "$package"
+  prepare_package "$index" "$package"
+  index=$((index + 1))
+done
+
+# Pass 2: every package passed validation.
+index=0
+for package in "${PACKAGES[@]}"; do
+  apply_package "$index" "$package"
+  index=$((index + 1))
 done
