@@ -26,7 +26,7 @@ github-api:1.330-492.v3941a_032db_2a_
 github-branch-source:1986.v801e40614d00
 github-checks:710.v756946918b_dd
 github:1.47.0
-gson-api:2.14.0-201.v8eefe5515533
+gson-api:2.15.0-212.v085f60a_8093b_
 instance-identity:203.v15e81a_1b_7a_38
 ionicons-api:94.vcc3065403257
 jackson-annotations2-api:2.22-19.v10a_a_582ea_26e
@@ -55,6 +55,7 @@ nimbus-jose-jwt-api:10.10-12.vd4e6d651b_7f7
 oic-auth:4.731.v4932b_506e767
 okhttp-api:5.5.0-242.v1482d48d3ea_3
 pipeline-build-step:601.v6d4c6d1a_9dc7
+pipeline-graph-view:1053.v9df19e6ceed2
 pipeline-groovy-lib:822.vc95f70dea_db_7
 pipeline-input-step:560.v56198a_642157
 pipeline-milestone-step:152.v6e22b_8cfc66c

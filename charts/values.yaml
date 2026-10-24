@@ -114,6 +114,7 @@ jenkins:
     resources:
       requests:
         cpu: 10m # Reserve 10m for jnlp and the shell container.
+        memory: 50Mi # Reserve 50Mi; the upstream 512Mi memory limit still caps them.
     # Apply pod-level token and user restrictions.
     yamlTemplate: |-
       apiVersion: v1 # Use the Kubernetes Pod API.
@@ -204,7 +205,7 @@ jenkins:
           resources:
             requests:
               cpu: 10m # Reserve little CPU so build pods fit on the small nodes.
-              memory: 1Gi # Reserve memory for builds.
+              memory: 50Mi # Reserve little memory so build pods fit; the 4Gi limit caps builds.
             limits:
               cpu: "" # Set no CPU limit; the upstream template requires the key.
               memory: 4Gi # Cap build memory.
