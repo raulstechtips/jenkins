@@ -80,7 +80,7 @@ tests:
     asserts:
       - matchRegex:
           path: data["jcasc-default-config.yaml"]
-          pattern: '(?s)- name: "builder".*?- name: "kaniko"\n.*?command: /busybox/cat.*?image: "docker\.io/martizih/kaniko:v1\.28\.6-debug@sha256:7ab44d0131c3051b6dea128067e258c7afb5c4815082a93b9cf6c624f2140bf0".*?resourceLimitMemory: 4Gi\n\s+resourceRequestCpu: 500m\n\s+resourceRequestMemory: 1Gi\n\s+runAsUser: 0\n\s+ttyEnabled: true'
+          pattern: '(?s)- name: "builder".*?- name: "kaniko"\n.*?command: /busybox/cat.*?image: "docker\.io/martizih/kaniko:v1\.28\.6-debug@sha256:7ab44d0131c3051b6dea128067e258c7afb5c4815082a93b9cf6c624f2140bf0".*?resourceLimitMemory: 4Gi\n\s+resourceRequestCpu: 10m\n\s+resourceRequestMemory: 1Gi\n\s+runAsUser: 0\n\s+ttyEnabled: true'
 
   - it: applies jenkins.agentAffinity to the builder template
     set:
