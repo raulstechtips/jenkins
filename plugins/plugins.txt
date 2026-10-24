@@ -12,3 +12,4 @@ kubernetes-credentials-provider:1.315.v92008589c044
 pipeline-utility-steps:3.810.va_7672d206740
 job-dsl:3732.v9a_c49a_61a_313
 basic-branch-build-strategies:317.v85b_331d6cc42
+pipeline-graph-view:1053.v9df19e6ceed2
