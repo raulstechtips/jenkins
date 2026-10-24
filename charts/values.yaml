@@ -84,7 +84,7 @@ jenkins:
   controller:
     # CI packages the chart with its matching image tag and digest.
     image:
-      registry: ghcr.io # Pull the tested controller from GHCR.
+      registry: harbor.prod.raulstechtips.dev # Pull the tested controller from Harbor; the Actions backup sets ghcr.io itself.
       repository: raulstechtips/jenkins-controller # Built from plugins/Dockerfile.
       tag: "" # Release packaging supplies <version>@sha256:<digest>.
     installPlugins: false # Plugins are already installed in the controller image.
