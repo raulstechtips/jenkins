@@ -1,2 +1,2 @@
-@Library('jenkins-shared-library@feature/DEVSECOPS-34-shared-library') _
+@Library('jenkins-shared-library@main') _
 clusterConfigurablePipeline()
