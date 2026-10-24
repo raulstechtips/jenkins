@@ -1,0 +1,21 @@
+project-config:
+  project-name: jenkins
+  project-description: "Jenkins wrapper chart and baked controller image"
+  project-namespace: jenkins
+  publish-targets: [ghcr]
+  test-command: "bash plugins/lock.sh --check"
+  docker-image:
+    name: jenkins-controller
+    dockerfile: plugins/Dockerfile
+    context: plugins
+  helm-image-tag-path: .jenkins.controller.image.tag
+  pipeline-steps:
+    helm-test: true
+    unit-test: true
+    trivy-scan: true
+    opengrep-scan: true
+    build-docker-image: true
+    helm-package-upload: true
+    helm-install: false
+    helm-clean-install: false
+    argo-deploy: true
