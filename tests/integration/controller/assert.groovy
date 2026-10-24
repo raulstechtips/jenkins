@@ -72,7 +72,8 @@ def navigator = folder.navigators.find { it instanceof GitHubSCMNavigator }
 assert navigator != null
 assert navigator.repoOwner == 'controller-test-owner'
 assert navigator.credentialsId == 'github-app'
-assert navigator.traits.size() == 3
+assert navigator.traits.size() == 2
+assert !navigator.traits.any { it.class.simpleName == 'ForkPullRequestDiscoveryTrait' }
 assert folder.projectFactories.size() == 1
 assert folder.buildStrategies.size() == 2
 def suppression = folder.properties.get(NoTriggerOrganizationFolderProperty)

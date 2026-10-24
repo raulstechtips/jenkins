@@ -308,7 +308,7 @@ tests:
       - matchRegex:
           path: data["jobs.yaml"]
           pattern: 'gitHubPullRequestDiscovery \{ strategyId\(1\) \}'
-      - matchRegex:
+      - notMatchRegex:
           path: data["jobs.yaml"]
           pattern: 'gitHubForkDiscovery \{ strategyId\(1\); trust \{ gitHubTrustPermissions\(\) \} \}'
       - matchRegex:
