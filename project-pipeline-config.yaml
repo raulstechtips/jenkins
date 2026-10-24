@@ -2,7 +2,7 @@ project-config:
   project-name: jenkins
   project-description: "Jenkins wrapper chart and baked controller image"
   project-namespace: jenkins
-  publish-targets: [ghcr]
+  publish-targets: [harbor]
   test-command: "bash plugins/lock.sh --check"
   docker-image:
     name: jenkins-controller
