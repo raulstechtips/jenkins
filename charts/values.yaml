@@ -168,6 +168,42 @@ jenkins:
           args: infinity # Keep the container alive for the pod lifetime.
           TTYEnabled: false # Do not allocate an interactive terminal.
           runAsUser: 1000 # Run deployment commands without root.
+    # Merge a Kaniko image build template into the same upstream Kubernetes cloud.
+    builder:
+      podName: builder # Give image build pods a separate name.
+      componentName: jenkins-builder # Do not share the generic Jenkins label.
+      customJenkinsLabels: [builder] # Let image build stages request this agent.
+      nodeUsageMode: EXCLUSIVE # Do not accept work without this agent label.
+      # Keep the agent pod label required by the upstream NetworkPolicy.
+      podLabels:
+        jenkins/jenkins-jenkins-agent: "true" # Match release jenkins and agent component jenkins-agent.
+      # Give image builds no cluster token; Kaniko needs root inside the container only.
+      yamlTemplate: |-
+        apiVersion: v1
+        kind: Pod
+        spec:
+          automountServiceAccountToken: false
+          {{- with .Values.agentAffinity }}
+          affinity:
+            {{- toYaml . | nindent 4 }}
+          {{- end }}
+      # Supply the Kaniko debug image, which has a shell for the pipeline steps.
+      additionalContainers:
+        - sideContainerName: kaniko # Expose the image builder to pipelines.
+          image: # Pin the multi-platform image index.
+            repository: docker.io/martizih/kaniko # Supply the maintained Kaniko fork.
+            tag: "v1.28.6-debug@sha256:7ab44d0131c3051b6dea128067e258c7afb5c4815082a93b9cf6c624f2140bf0" # Prevent tag drift.
+          command: /busybox/cat # Keep the container alive for pipeline commands.
+          args: "" # Pass no arguments; the upstream template requires the key.
+          TTYEnabled: true # Keep cat running while it waits for input.
+          runAsUser: 0 # Kaniko must unpack image layers as root.
+          resources:
+            requests:
+              cpu: 500m # Reserve CPU for builds.
+              memory: 1Gi # Reserve memory for builds.
+            limits:
+              cpu: "" # Set no CPU limit; the upstream template requires the key.
+              memory: 4Gi # Cap build memory.
   # Allow the credentials provider to watch labelled Secrets.
   rbac:
     readSecrets: true # Grant the controller get, watch and list access to Secrets.
