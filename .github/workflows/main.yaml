@@ -1,12 +1,11 @@
 name: main
 
+# Manual backup. Jenkins builds this repo with the shared library (see Jenkinsfile).
+# Run this workflow by hand only when Jenkins is unavailable.
 # One pipeline: test the amd64 controller image and the chart, then scan both.
 # Publish the tested image before the matched chart.
 # The scan only warns. A HIGH or CRITICAL finding does not stop the publish.
 on:
-  push:
-    branches: [main, 'feature/**', 'bugfix/**', 'hotfix/**', 'release/**']
-    tags-ignore: ['**']
   workflow_dispatch:
 
 concurrency: main-${{ github.ref }}
