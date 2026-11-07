@@ -328,7 +328,7 @@ tests:
           pattern: 'allBranchesSame|suppressAutomaticTriggering'
       - matchRegex:
           path: data["jobs.yaml"]
-          pattern: 'buildStrategies \{\s+buildRegularBranches\(\)\s+buildChangeRequests \{ ignoreTargetOnlyChanges\(true\); ignoreUntrustedChanges\(true\) \}'
+          pattern: 'buildStrategies \{\s+(//[^\n]*\s+)*buildAllBranches \{\s+strategies \{\s+buildRegularBranches\(\)\s+ignoreCommitterStrategy \{\s+ignoredAuthors\(''raulstechtips-jenkins\[bot\]@users\.noreply\.github\.com''\)\s+allowBuildIfNotExcludedAuthor\(true\)\s+\}\s+\}\s+\}\s+buildChangeRequests \{ ignoreTargetOnlyChanges\(true\); ignoreUntrustedChanges\(true\) \}'
       - notMatchRegex:
           path: data["jobs.yaml"]
           pattern: 'skipInitialBuildOnFirstBranchIndexing|useScriptSecurity|configure \{'
