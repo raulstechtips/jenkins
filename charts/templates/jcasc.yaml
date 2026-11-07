@@ -148,7 +148,17 @@ data:
             orphanedItemStrategy { discardOldItems { daysToKeep(7) } }
             properties { suppressFolderAutomaticTriggering { branches('.*'); strategy('INDEXING') } }
             buildStrategies {
-              buildRegularBranches()
+              // Build a branch only when the push has a commit by a person, so the bot's
+              // chart version commits start no build.
+              buildAllBranches {
+                strategies {
+                  buildRegularBranches()
+                  ignoreCommitterStrategy {
+                    ignoredAuthors('raulstechtips-jenkins[bot]@users.noreply.github.com')
+                    allowBuildIfNotExcludedAuthor(true)
+                  }
+                }
+              }
               buildChangeRequests { ignoreTargetOnlyChanges(true); ignoreUntrustedChanges(true) }
             }
           }
