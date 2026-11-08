@@ -86,7 +86,7 @@ jenkins:
     image:
       registry: ghcr.io # Pull the tested controller from GHCR.
       repository: raulstechtips/jenkins-controller # Built from plugins/Dockerfile.
-      tag: "" # Release packaging supplies <version>@sha256:<digest>.
+      tag: "0.1.0" # Release packaging supplies <version>@sha256:<digest>.
     installPlugins: false # Plugins are already installed in the controller image.
     overwritePlugins: true # Clear old PVC plugins before copying the image's plugin set.
     # Keep recovery credentials available when the identity provider is down.
