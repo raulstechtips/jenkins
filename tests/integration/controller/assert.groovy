@@ -8,8 +8,6 @@ import jenkins.model.Jenkins
 import org.jenkinsci.plugins.github_branch_source.GitHubAppCredentials
 import org.jenkinsci.plugins.github_branch_source.GitHubSCMNavigator
 import org.jenkinsci.plugins.workflow.libs.GlobalLibraries
-import org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition
-import org.jenkinsci.plugins.workflow.job.WorkflowJob
 
 def jenkins = Jenkins.get()
 assert jenkins.initLevel == InitMilestone.COMPLETED
@@ -82,16 +80,6 @@ def suppression = folder.properties.get(NoTriggerOrganizationFolderProperty)
 assert suppression != null
 assert suppression.getBranches() == '.*'
 assert suppression.getStrategy().name() == 'INDEXING'
-def operation = jenkins.getItem('controller-test-operation')
-assert operation instanceof WorkflowJob
-assert operation.definition instanceof CpsScmFlowDefinition
-assert operation.definition.scriptPath == 'pipelines/update-infisical-auth.Jenkinsfile'
-assert operation.definition.lightweight
-assert operation.definition.scm.userRemoteConfigs*.url == ['https://github.com/example/platform-operations.git']
-assert operation.definition.scm.userRemoteConfigs*.credentialsId == ['github-app']
-assert operation.definition.scm.branches*.name == ['feature/DEVSECOPS-62']
-assert operation.triggers.isEmpty()
-assert operation.lastBuild == null
 println 'Loaded plugin receipt (name:version):'
 jenkins.pluginManager.plugins.toList().sort { it.shortName }.each {
     assert it.active : "Inactive loaded plugin: ${it.shortName}"

@@ -76,19 +76,8 @@ webhookRoute:
 # kubectl -n <ns> delete rolebinding jenkins-deployer
 # Prune is off, so removal from this list does not delete the RoleBinding.
 deployNamespaces: [] # Grant no deployment rights until namespaces are listed.
-# Allow the operational job to patch only these existing Infisical resources.
-# This does not grant namespace-wide deployment access.
-infisicalAuthUpdate:
-  enabled: false
-  credentialsRef:
-    name: ""
-    namespace: ""
-  connectionRef:
-    name: ""
-    namespace: ""
 sharedLibraries: [] # Add explicit libraries with name, repo and optional defaultVersion.
 organizationFolders: [] # Add App-owned organization folders with name and owner.
-pipelineJobs: [] # Add manual Pipeline jobs with name, repo, branch and scriptPath.
 # Override only the required upstream behavior.
 jenkins:
   # Configure controller startup from Git.
