@@ -117,7 +117,7 @@ data:
                     credentialsId: {{ $.Values.github.credentialId | quote }}
           {{- end }}
 {{- end }}
-{{- with .Values.organizationFolders }}
+{{- if or .Values.organizationFolders .Values.pipelineJobs }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -130,7 +130,7 @@ data:
   jobs.yaml: |-
     jobs:
       - script: |
-          {{- range . }}
+          {{- range .Values.organizationFolders }}
           organizationFolder('{{ .name | replace "\\" "\\\\" | replace "'" "\\'" }}') {
             organizations {
               github {
@@ -160,6 +160,25 @@ data:
                 }
               }
               buildChangeRequests { ignoreTargetOnlyChanges(true); ignoreUntrustedChanges(true) }
+            }
+          }
+          {{- end }}
+          {{- range .Values.pipelineJobs }}
+          pipelineJob('{{ .name | replace "\\" "\\\\" | replace "'" "\\'" }}') {
+            definition {
+              cpsScm {
+                scm {
+                  git {
+                    remote {
+                      url('{{ .repo | replace "\\" "\\\\" | replace "'" "\\'" }}')
+                      credentials('{{ $.Values.github.credentialId | replace "\\" "\\\\" | replace "'" "\\'" }}')
+                    }
+                    branch('{{ .branch | replace "\\" "\\\\" | replace "'" "\\'" }}')
+                  }
+                }
+                scriptPath('{{ .scriptPath | replace "\\" "\\\\" | replace "'" "\\'" }}')
+                lightweight()
+              }
             }
           }
           {{- end }}

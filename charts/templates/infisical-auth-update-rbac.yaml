@@ -1,0 +1,34 @@
+{{- if .Values.infisicalAuthUpdate.enabled }}
+{{- $credentials := .Values.infisicalAuthUpdate.credentialsRef }}
+{{- $connection := .Values.infisicalAuthUpdate.connectionRef }}
+{{- range $target := list
+    (dict "suffix" "credentials" "ref" $credentials "apiGroup" "" "resource" "secrets")
+    (dict "suffix" "connection" "ref" $connection "apiGroup" "secrets.infisical.com" "resource" "infisicalconnections")
+}}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $.Release.Name }}-infisical-{{ $target.suffix }}-update
+  namespace: {{ required "infisicalAuthUpdate resource namespaces are required when enabled" $target.ref.namespace | quote }}
+rules:
+  - apiGroups: [{{ $target.apiGroup | quote }}]
+    resources: [{{ $target.resource | quote }}]
+    resourceNames: [{{ required "infisicalAuthUpdate resource names are required when enabled" $target.ref.name | quote }}]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $.Release.Name }}-infisical-{{ $target.suffix }}-update
+  namespace: {{ $target.ref.namespace | quote }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $.Release.Name }}-infisical-{{ $target.suffix }}-update
+subjects:
+  - kind: ServiceAccount
+    name: jenkins-deployer
+    namespace: {{ $.Release.Namespace }}
+{{- end }}
+{{- end }}

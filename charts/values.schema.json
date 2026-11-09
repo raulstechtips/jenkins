@@ -162,6 +162,15 @@
       }
     },
     "deployNamespaces": { "$ref": "#/definitions/stringList" },
+    "infisicalAuthUpdate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "credentialsRef": { "$ref": "#/definitions/secretRef" },
+        "connectionRef": { "$ref": "#/definitions/secretRef" }
+      }
+    },
     "sharedLibraries": {
       "type": "array",
       "items": {
@@ -184,6 +193,20 @@
         "properties": {
           "name": { "type": "string", "minLength": 1 },
           "owner": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "pipelineJobs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "repo", "branch", "scriptPath"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" },
+          "repo": { "type": "string", "minLength": 1 },
+          "branch": { "type": "string", "minLength": 1 },
+          "scriptPath": { "type": "string", "minLength": 1 }
         }
       }
     },

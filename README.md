@@ -7,6 +7,11 @@ This repository contains the Helm chart that installs Jenkins in the cluster.
 The chart wraps the upstream `jenkins` Helm chart `5.9.73` (Jenkins `2.580.1`) as a dependency.
 The chart also adds our own resources: Infisical secrets, Keycloak OIDC login, Traefik IngressRoutes, deployer RBAC and JCasC configuration.
 All Jenkins configuration comes from Git. You do not configure Jenkins in the UI.
+Manual operational jobs are declared with `pipelineJobs` entries containing
+`name`, `repo`, `branch`, and `scriptPath`. They use the configured GitHub
+credential and have no automatic trigger. `infisicalAuthUpdate` optionally
+grants the deployer service account `get` and `patch` on one credentials Secret
+and one InfisicalConnection. It does not grant namespace-wide administration.
 Each successful push build publishes a controller image and a matching chart version to GHCR.
 The chart pins the controller image by digest. Change only the chart version to deploy the pair.
 Argo CD then installs the chart from this OCI address, with values from the `cluster-config` repository:

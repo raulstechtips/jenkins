@@ -14,6 +14,11 @@ sharedLibraries:
 organizationFolders:
   - name: controller-test-organization
     owner: controller-test-owner
+pipelineJobs:
+  - name: controller-test-operation
+    repo: https://github.com/example/platform-operations.git
+    branch: feature/DEVSECOPS-62
+    scriptPath: pipelines/update-infisical-auth.Jenkinsfile
 jenkins:
   controller:
     jenkinsUrl: http://127.0.0.1:8080

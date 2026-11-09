@@ -1,0 +1,83 @@
+suite: Infisical authentication update access
+templates:
+  - templates/infisical-auth-update-rbac.yaml
+release:
+  name: jenkins
+  namespace: jenkins
+tests:
+  - it: grants no access by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: grants only get and patch on the two configured resources
+    set:
+      infisicalAuthUpdate:
+        enabled: true
+        credentialsRef: {name: universal-auth-credentials, namespace: infisical}
+        connectionRef: {name: infisical-prod, namespace: default}
+    asserts:
+      - hasDocuments:
+          count: 4
+      - equal:
+          path: rules
+          value:
+            - apiGroups: [""]
+              resources: ["secrets"]
+              resourceNames: ["universal-auth-credentials"]
+              verbs: ["get", "patch"]
+        documentIndex: 0
+      - equal:
+          path: metadata.namespace
+          value: infisical
+        documentIndex: 0
+      - equal:
+          path: roleRef
+          value:
+            apiGroup: rbac.authorization.k8s.io
+            kind: Role
+            name: jenkins-infisical-credentials-update
+        documentIndex: 1
+      - equal:
+          path: subjects
+          value: [{kind: ServiceAccount, name: jenkins-deployer, namespace: jenkins}]
+        documentIndex: 1
+      - equal:
+          path: rules
+          value:
+            - apiGroups: ["secrets.infisical.com"]
+              resources: ["infisicalconnections"]
+              resourceNames: ["infisical-prod"]
+              verbs: ["get", "patch"]
+        documentIndex: 2
+      - equal:
+          path: metadata.namespace
+          value: default
+        documentIndex: 2
+      - equal:
+          path: roleRef
+          value:
+            apiGroup: rbac.authorization.k8s.io
+            kind: Role
+            name: jenkins-infisical-connection-update
+        documentIndex: 3
+      - equal:
+          path: subjects
+          value: [{kind: ServiceAccount, name: jenkins-deployer, namespace: jenkins}]
+        documentIndex: 3
+
+  - it: rejects enabling access without the target names
+    set:
+      infisicalAuthUpdate.enabled: true
+      infisicalAuthUpdate.credentialsRef.namespace: infisical
+      infisicalAuthUpdate.connectionRef.namespace: default
+    asserts:
+      - failedTemplate:
+          errorMessage: infisicalAuthUpdate resource names are required when enabled
+
+  - it: rejects enabling access without the target namespaces
+    set:
+      infisicalAuthUpdate.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: infisicalAuthUpdate resource namespaces are required when enabled
