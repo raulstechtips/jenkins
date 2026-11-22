@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add the `builder-large` agent pod template. It is the same as `builder`, but its Kaniko container requests 10Gi of memory with a 12Gi limit, for image builds that need more memory, such as the Infisical fork ([DEVSECOPS-208](https://raulstechtips.atlassian.net/browse/DEVSECOPS-208)).
+
 ### Changed
 
 ### Fixed

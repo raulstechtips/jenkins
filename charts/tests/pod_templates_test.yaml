@@ -97,11 +97,41 @@ tests:
           path: data["jcasc-default-config.yaml"]
           pattern: '(?s)- name: "builder".*?yaml: \|-\n.*?automountServiceAccountToken: false\n\s+affinity:\n\s+nodeAffinity:.*?- node-a\n\s+- node-b'
 
+  - it: adds an EXCLUSIVE builder-large template with the builder-large label and no cluster token
+    asserts:
+      - matchRegex:
+          path: data["jcasc-default-config.yaml"]
+          pattern: '(?s)- name: "builder-large".*?label: "jenkins-jenkins-builder-large builder-large"\n\s+nodeUsageMode: "EXCLUSIVE"'
+      - matchRegex:
+          path: data["jcasc-default-config.yaml"]
+          pattern: 'label: "jenkins-jenkins-builder-large builder-large"\n(?:[^\n]*\n){3}\s+serviceAccount: "default"\n\s+slaveConnectTimeoutStr: "100"\n\s+yaml: \|-\n\s+apiVersion: v1\n\s+kind: Pod\n\s+spec:\n\s+automountServiceAccountToken: false\n\s+yamlMergeStrategy'
+
+  - it: gives the builder-large Kaniko container a 10Gi request and a 12Gi limit
+    asserts:
+      - matchRegex:
+          path: data["jcasc-default-config.yaml"]
+          pattern: '(?s)- name: "builder-large".*?- name: "kaniko"\n.*?command: /busybox/cat.*?image: "docker\.io/martizih/kaniko:v1\.28\.6-debug@sha256:7ab44d0131c3051b6dea128067e258c7afb5c4815082a93b9cf6c624f2140bf0".*?resourceLimitMemory: 12Gi\n\s+resourceRequestCpu: 10m\n\s+resourceRequestMemory: 10Gi\n\s+runAsUser: 0\n\s+ttyEnabled: true'
+
+  - it: applies jenkins.agentAffinity to the builder-large template
+    set:
+      jenkins.agentAffinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values: [node-a, node-b]
+    asserts:
+      - matchRegex:
+          path: data["jcasc-default-config.yaml"]
+          pattern: '(?s)- name: "builder-large".*?yaml: \|-\n.*?automountServiceAccountToken: false\n\s+affinity:\n\s+nodeAffinity:.*?- node-a\n\s+- node-b'
+
   - it: keeps generic and deployer unchanged next to the builder
     asserts:
       - matchRegex:
           path: data["jcasc-default-config.yaml"]
-          pattern: '(?s)templates:\n\s+- name: "generic".*?- name: "builder".*?- name: "deployer"'
+          pattern: '(?s)templates:\n\s+- name: "generic".*?- name: "builder".*?- name: "builder-large".*?- name: "deployer"'
       - matchRegex:
           path: data["jcasc-default-config.yaml"]
           pattern: '(?s)- name: "deployer".*?serviceAccount: "jenkins-deployer".*?automountServiceAccountToken: true\n\s+securityContext:\n\s+runAsNonRoot: true\n\s+runAsUser: 1000\n\s+yamlMergeStrategy'

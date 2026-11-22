@@ -209,6 +209,42 @@ jenkins:
             limits:
               cpu: "" # Set no CPU limit; the upstream template requires the key.
               memory: 4Gi # Cap build memory.
+    # Same as builder, for image builds that need more memory (the Infisical fork build).
+    builder-large:
+      podName: builder-large # Give large image build pods a separate name.
+      componentName: jenkins-builder-large # Do not share the builder Jenkins label.
+      customJenkinsLabels: [builder-large] # Let large image build stages request this agent.
+      nodeUsageMode: EXCLUSIVE # Do not accept work without this agent label.
+      # Keep the agent pod label required by the upstream NetworkPolicy.
+      podLabels:
+        jenkins/jenkins-jenkins-agent: "true" # Match release jenkins and agent component jenkins-agent.
+      # Give image builds no cluster token; Kaniko needs root inside the container only.
+      yamlTemplate: |-
+        apiVersion: v1
+        kind: Pod
+        spec:
+          automountServiceAccountToken: false
+          {{- with .Values.agentAffinity }}
+          affinity:
+            {{- toYaml . | nindent 4 }}
+          {{- end }}
+      # Supply the same Kaniko debug image as builder.
+      additionalContainers:
+        - sideContainerName: kaniko # Expose the image builder to pipelines.
+          image: # Pin the multi-platform image index.
+            repository: docker.io/martizih/kaniko # Supply the maintained Kaniko fork.
+            tag: "v1.28.6-debug@sha256:7ab44d0131c3051b6dea128067e258c7afb5c4815082a93b9cf6c624f2140bf0" # Prevent tag drift.
+          command: /busybox/cat # Keep the container alive for pipeline commands.
+          args: "" # Pass no arguments; the upstream template requires the key.
+          TTYEnabled: true # Keep cat running while it waits for input.
+          runAsUser: 0 # Kaniko must unpack image layers as root.
+          resources:
+            requests:
+              cpu: 10m # Reserve little CPU; the build uses free CPU without a limit.
+              memory: 10Gi # Reserve the build memory, so only a node with room schedules the pod.
+            limits:
+              cpu: "" # Set no CPU limit; the upstream template requires the key.
+              memory: 12Gi # Cap build memory; the Dockerfile allows Node up to 8 GiB.
   # Allow the credentials provider to watch labelled Secrets.
   rbac:
     readSecrets: true # Grant the controller get, watch and list access to Secrets.
