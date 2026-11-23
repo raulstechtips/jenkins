@@ -13,10 +13,10 @@ tests:
     asserts:
       - equal:
           path: spec.template.spec.initContainers[?(@.name == "init")].image
-          value: ghcr.io/raulstechtips/jenkins-controller:test-release@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          value: harbor.prod.raulstechtips.dev/raulstechtips/jenkins-controller:test-release@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
       - equal:
           path: spec.template.spec.containers[?(@.name == "jenkins")].image
-          value: ghcr.io/raulstechtips/jenkins-controller:test-release@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          value: harbor.prod.raulstechtips.dev/raulstechtips/jenkins-controller:test-release@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   - it: removes stale home plugins without downloading replacements at startup
     template: charts/jenkins/templates/config.yaml
     asserts:
